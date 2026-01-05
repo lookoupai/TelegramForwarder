@@ -1,0 +1,56 @@
+<div class="overflow-hidden rounded-2xl">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-slate-200 text-sm text-slate-600">
+            <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                <tr>
+                    <th class="px-4 py-3 text-left">ID</th>
+                    <th class="px-4 py-3 text-left">源 → 目标</th>
+                    <th class="px-4 py-3 text-left">模式</th>
+                    <th class="px-4 py-3 text-left">状态</th>
+                    <th class="px-4 py-3 text-right">操作</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 bg-white">
+                {% for rule in rules %}
+                    <tr class="transition hover:bg-slate-50">
+                        <td class="px-4 py-4 font-mono text-slate-500">#{{ rule.id }}</td>
+                        <td class="px-4 py-4">
+                            <p class="font-medium text-slate-900">{{ rule.source_chat_name or '未命名' }}</p>
+                            <p class="text-xs text-slate-400">→ {{ rule.target_chat_name or '未命名' }}</p>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <span class="badge bg-blue-100 text-blue-700">{{ rule.forward_mode }}</span>
+                                <span class="badge bg-indigo-100 text-indigo-700">{{ rule.add_mode }}</span>
+                                <span class="badge bg-slate-100 text-slate-600">{{ rule.handle_mode }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4">
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <span class="badge {{ 'bg-emerald-100 text-emerald-700' if rule.enable_rule else 'bg-slate-100 text-slate-500' }}">
+                                    {{ '启用' if rule.enable_rule else '禁用' }}
+                                </span>
+                                <span class="badge {{ 'bg-purple-100 text-purple-700' if rule.use_bot else 'bg-amber-100 text-amber-700' }}">
+                                    {{ 'Bot' if rule.use_bot else 'User' }}
+                                </span>
+                                <span class="badge {{ 'bg-orange-100 text-orange-700' if rule.only_rss else 'bg-slate-100 text-slate-500' }}">
+                                    {{ '仅RSS' if rule.only_rss else '多渠道' }}
+                                </span>
+                                <span class="badge bg-slate-100 text-slate-500">关键词 {{ rule.keywords_count }}</span>
+                            </div>
+                        </td>
+                        <td class="px-4 py-4 text-right">
+                            <button type="button" class="rounded-full border border-blue-200 px-4 py-2 text-xs font-semibold text-blue-600 transition hover:border-blue-400 hover:text-blue-700" onclick="loadRule({{ rule.id }})">
+                                编辑
+                            </button>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="5" class="px-4 py-6 text-center text-slate-400">暂无规则，请先通过 Telegram 绑定。</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

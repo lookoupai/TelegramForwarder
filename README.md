@@ -124,6 +124,17 @@ docker-compose pull
 ```bash
 docker-compose up -d
 ```
+
+## 🧱 GitHub Actions 多架构镜像
+
+- 仓库默认启用 `.github/workflows/docker-build.yml`，在 `main` 分支推送、打 `v*` 标签或手动触发 `workflow_dispatch` 时，会使用 Docker Buildx 同时构建 `linux/amd64` 与 `linux/arm64` 镜像，并推送到 `ghcr.io/<owner>/telegramforwarder`。
+- 工作流依赖默认的 `GITHUB_TOKEN` 写入 GitHub Packages，无需额外 secrets；如果需要推送到其它 Registry，可在仓库 Secrets 中新增登录凭据并调整 workflow。
+- 拉取镜像示例：
+  ```bash
+  docker pull ghcr.io/lookoupai/telegramforwarder:latest
+  ```
+- 若要在外网部署，建议在 `docker-compose.yml` 或 Kubernetes manifests 中引用上述 GHCR 镜像，确保 ARM 服务器（如 AWS Graviton、树莓派）与 AMD 服务器共用同一镜像标签。
+
 ## 📚 使用指南
 
 ### 🌟 基础使用示例
@@ -553,5 +564,4 @@ UFB相关
 ## 📄 开源协议
 
 本项目采用 [GPL-3.0](LICENSE) 开源协议，详细信息请参阅 [LICENSE](LICENSE) 文件。
-
 

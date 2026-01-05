@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>转发规则控制台</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <style>
+        body { font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+        .card { box-shadow: 0 6px 30px rgba(15, 23, 42, 0.08); }
+        .badge { border-radius: 999px; font-size: 0.75rem; padding: 0.15rem 0.7rem; }
+    </style>
+</head>
+<body class="min-h-full bg-slate-50 text-slate-900">
+    <div class="min-h-screen">
+        <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+                <div>
+                    <p class="text-xs uppercase tracking-widest text-slate-400">Telegram Forwarder</p>
+                    <h1 class="text-2xl font-semibold text-slate-900">网页管理控制台</h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="hidden text-sm text-slate-500 sm:block">{{ user.username }}</span>
+                    <a href="/logout" class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900">退出</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <section class="space-y-4">
+                <div class="flex flex-wrap gap-3 text-sm text-slate-500">
+                    <span class="badge bg-blue-100 text-blue-700">实时热更新</span>
+                    <span class="badge bg-slate-100 text-slate-700">支持批量规则</span>
+                    <span class="badge bg-orange-100 text-orange-700">使用 HTMX 局部刷新</span>
+                </div>
+
+                <div id="rules-table" class="card w-full rounded-xl bg-white" hx-get="/admin/view/rules" hx-trigger="load, refreshRules from:body" hx-target="#rules-table" hx-swap="innerHTML">
+                    <div class="flex h-48 items-center justify-center text-slate-400">
+                        加载规则列表...
+                    </div>
+                </div>
+            </section>
+
+            <section id="rule-form-panel" class="mt-10 hidden lg:mt-12">
+                <div class="card rounded-2xl bg-white p-6">
+                    <div class="flex flex-col gap-1 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-slate-400">Rule Detail</p>
+                            <h2 class="text-xl font-semibold text-slate-900">规则详情面板</h2>
+                        </div>
+                        <div id="rule-meta" class="text-sm text-slate-500"></div>
+                    </div>
+
+                    <form id="rule-form" class="mt-6 grid gap-5 md:grid-cols-2" onsubmit="handleRuleSubmit(event)">
+                        {% for field, meta in form_fields %}
+                            <div class="flex flex-col gap-2">
+                                <label for="field-{{ field }}" class="text-sm font-medium text-slate-600">{{ meta.label }}</label>
+                                {% if meta.type == 'select' %}
+                                    <select id="field-{{ field }}" data-field="{{ field }}" data-field-type="select" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        {% for option in meta.options %}
+                                            <option value="{{ option.value }}">{{ option.label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% elif meta.type == 'number' %}
+                                    <input id="field-{{ field }}" data-field="{{ field }}" data-field-type="number" type="number" min="1" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="输入秒数" />
+                                {% else %}
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input id="field-{{ field }}" data-field="{{ field }}" data-field-type="boolean" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                        <span>开启</span>
+                                    </label>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+
+                        <div class="md:col-span-2">
+                            <button type="submit" class="w-full rounded-xl bg-blue-600 px-6 py-3 text-base font-semibold text-white shadow transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2">保存设置并热更新</button>
+                            <p id="form-status" class="mt-2 text-sm text-slate-500"></p>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        let currentRuleId = null;
+
+        async function loadRule(ruleId) {
+            try {
+                const resp = await fetch(`/admin/api/rules/${ruleId}`);
+                if (!resp.ok) throw new Error('加载规则失败');
+                const data = await resp.json();
+                currentRuleId = data.id;
+                const metaEl = document.getElementById('rule-meta');
+                metaEl.textContent = `规则 #${data.id} ｜ ${data.source_chat_name || '未知'} → ${data.target_chat_name || '未知'}`;
+                document.getElementById('rule-form-panel').classList.remove('hidden');
+                populateForm(data);
+                setStatus('');
+            } catch (error) {
+                setStatus(error.message || '加载失败', true);
+            }
+        }
+
+        function populateForm(data) {
+            document.querySelectorAll('[data-field]').forEach((input) => {
+                const key = input.dataset.field;
+                const type = input.dataset.fieldType;
+                if (!(key in data)) return;
+
+                if (type === 'select') {
+                    input.value = data[key] ?? '';
+                } else if (type === 'number') {
+                    input.value = data[key] ?? '';
+                } else {
+                    input.checked = Boolean(data[key]);
+                }
+            });
+        }
+
+        async function handleRuleSubmit(event) {
+            event.preventDefault();
+            if (!currentRuleId) {
+                setStatus('请先选择要编辑的规则', true);
+                return;
+            }
+
+            const payload = {};
+            document.querySelectorAll('[data-field]').forEach((input) => {
+                const key = input.dataset.field;
+                const type = input.dataset.fieldType;
+                if (type === 'select') {
+                    payload[key] = input.value;
+                } else if (type === 'number') {
+                    if (input.value) {
+                        payload[key] = Number(input.value);
+                    }
+                } else {
+                    payload[key] = input.checked;
+                }
+            });
+
+            try {
+                setStatus('保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                if (!resp.ok) throw new Error('保存失败');
+                await resp.json();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setStatus('已更新，Telegram 将即时生效');
+            } catch (error) {
+                setStatus(error.message || '保存失败', true);
+            }
+        }
+
+        function setStatus(message, isError = false) {
+            const el = document.getElementById('form-status');
+            if (!message) {
+                el.textContent = '';
+                return;
+            }
+            el.textContent = message;
+            el.className = `mt-2 text-sm ${isError ? 'text-red-600' : 'text-slate-500'}`;
+        }
+
+        window.loadRule = loadRule;
+    </script>
+</body>
+</html>
