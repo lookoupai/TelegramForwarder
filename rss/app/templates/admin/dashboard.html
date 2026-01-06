@@ -7,7 +7,18 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.14/dist/tailwind.min.css" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         body { font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
@@ -523,8 +534,9 @@
 
                 <div id="create-manual-panel" class="hidden space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
                     <p class="text-xs text-slate-500">
-                        说明：Web 进程无法直接解析 t.me 链接为 ID，建议用 Telegram 里先执行一次 <span class="font-mono">/bind</span> 自动写入聊天；
-                        或在此手动填写 Telethon 的聊天 ID（数字）。
+                        说明：当前 Web 进程无法把 <span class="font-mono">t.me</span> 链接解析成真实 chat_id。
+                        推荐先在 Telegram 执行 <span class="font-mono">/bind https://t.me/source https://t.me/target</span> 自动创建规则；
+                        或在这里手动填写数字 chat_id（Telethon 使用的 ID）。
                     </p>
                     <div class="grid gap-3 sm:grid-cols-2">
                         <input id="create-source-telegram-id" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="源 chat_id（数字）" />
@@ -684,10 +696,16 @@
         function updateCreateModeVisibility() {
             const mode = document.querySelector('input[name="create-mode"]:checked')?.value || 'select';
             const manualPanel = document.getElementById('create-manual-panel');
+            const sourceSelect = document.getElementById('create-source-chat');
+            const targetSelect = document.getElementById('create-target-chat');
             if (mode === 'manual') {
                 manualPanel.classList.remove('hidden');
+                sourceSelect.disabled = true;
+                targetSelect.disabled = true;
             } else {
                 manualPanel.classList.add('hidden');
+                sourceSelect.disabled = false;
+                targetSelect.disabled = false;
             }
         }
 
@@ -703,15 +721,23 @@
                 const mode = document.querySelector('input[name="create-mode"]:checked')?.value || 'select';
                 let requestBody;
                 if (mode === 'manual') {
+                    const sourceTid = (document.getElementById('create-source-telegram-id').value || '').trim();
+                    const targetTid = (document.getElementById('create-target-telegram-id').value || '').trim();
+                    if (!sourceTid || !targetTid) {
+                        throw new Error('请填写源/目标 chat_id（数字）');
+                    }
                     requestBody = {
-                        source_telegram_chat_id: document.getElementById('create-source-telegram-id').value,
-                        target_telegram_chat_id: document.getElementById('create-target-telegram-id').value,
+                        source_telegram_chat_id: sourceTid,
+                        target_telegram_chat_id: targetTid,
                         source_name: document.getElementById('create-source-name').value,
                         target_name: document.getElementById('create-target-name').value,
                     };
                 } else {
                     const source_chat_id = Number(document.getElementById('create-source-chat').value);
                     const target_chat_id = Number(document.getElementById('create-target-chat').value);
+                    if (!source_chat_id || !target_chat_id) {
+                        throw new Error('暂无可选聊天：请先在 Telegram 执行 /bind，或切换到“手动输入 Chat ID”');
+                    }
                     requestBody = { source_chat_id, target_chat_id };
                 }
                 const resp = await fetch('/admin/api/rules', {
