@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.14/dist/tailwind.min.css" rel="stylesheet" />
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
         body { font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
@@ -500,6 +500,17 @@
             </div>
             <div class="mt-4 space-y-4">
                 <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                        <input id="create-mode-select" type="radio" name="create-mode" value="select" class="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500" checked />
+                        <span>从已绑定聊天选择</span>
+                    </label>
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                        <input id="create-mode-manual" type="radio" name="create-mode" value="manual" class="h-4 w-4 border-slate-300 text-blue-600 focus:ring-blue-500" />
+                        <span>手动输入 Chat ID</span>
+                    </label>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
                     <div class="flex flex-col gap-2">
                         <label class="text-sm font-medium text-slate-600">源聊天</label>
                         <select id="create-source-chat" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
@@ -507,6 +518,19 @@
                     <div class="flex flex-col gap-2">
                         <label class="text-sm font-medium text-slate-600">目标聊天</label>
                         <select id="create-target-chat" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
+                    </div>
+                </div>
+
+                <div id="create-manual-panel" class="hidden space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                    <p class="text-xs text-slate-500">
+                        说明：Web 进程无法直接解析 t.me 链接为 ID，建议用 Telegram 里先执行一次 <span class="font-mono">/bind</span> 自动写入聊天；
+                        或在此手动填写 Telethon 的聊天 ID（数字）。
+                    </p>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <input id="create-source-telegram-id" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="源 chat_id（数字）" />
+                        <input id="create-target-telegram-id" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="目标 chat_id（数字）" />
+                        <input id="create-source-name" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="源聊天名称（可选）" />
+                        <input id="create-target-name" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="目标聊天名称（可选）" />
                     </div>
                 </div>
                 <p id="create-rule-status" class="text-sm text-slate-500"></p>
@@ -520,6 +544,12 @@
 
     <script>
         let currentRuleId = null;
+
+        document.addEventListener('change', (event) => {
+            if (event.target && event.target.name === 'create-mode') {
+                updateCreateModeVisibility();
+            }
+        });
 
         async function loadRule(ruleId) {
             try {
@@ -625,13 +655,39 @@
                 const chats = await resp.json();
                 if (!resp.ok) throw new Error(chats?.detail || '加载聊天列表失败');
                 const options = chats.map((c) => `<option value="${c.id}">${escapeHtml(c.name || '未命名')} (#${c.id} / ${escapeHtml(c.telegram_chat_id)})</option>`).join('');
-                document.getElementById('create-source-chat').innerHTML = options;
-                document.getElementById('create-target-chat').innerHTML = options;
+                const sourceSelect = document.getElementById('create-source-chat');
+                const targetSelect = document.getElementById('create-target-chat');
+                if (options) {
+                    sourceSelect.innerHTML = options;
+                    targetSelect.innerHTML = options;
+                    sourceSelect.disabled = false;
+                    targetSelect.disabled = false;
+                } else {
+                    sourceSelect.innerHTML = `<option value="">暂无已绑定聊天</option>`;
+                    targetSelect.innerHTML = `<option value="">暂无已绑定聊天</option>`;
+                    sourceSelect.disabled = true;
+                    targetSelect.disabled = true;
+                }
+
+                const mode = options ? 'select' : 'manual';
+                document.getElementById('create-mode-select').checked = mode === 'select';
+                document.getElementById('create-mode-manual').checked = mode === 'manual';
+                updateCreateModeVisibility();
                 document.getElementById('create-rule-modal').classList.remove('hidden');
                 document.getElementById('create-rule-modal').classList.add('flex');
                 setInlineStatus('create-rule-status', '');
             } catch (e) {
                 setInlineStatus('create-rule-status', e.message || '加载失败', true);
+            }
+        }
+
+        function updateCreateModeVisibility() {
+            const mode = document.querySelector('input[name="create-mode"]:checked')?.value || 'select';
+            const manualPanel = document.getElementById('create-manual-panel');
+            if (mode === 'manual') {
+                manualPanel.classList.remove('hidden');
+            } else {
+                manualPanel.classList.add('hidden');
             }
         }
 
@@ -644,18 +700,30 @@
         async function createRule() {
             try {
                 setInlineStatus('create-rule-status', '创建中...');
-                const source_chat_id = Number(document.getElementById('create-source-chat').value);
-                const target_chat_id = Number(document.getElementById('create-target-chat').value);
+                const mode = document.querySelector('input[name="create-mode"]:checked')?.value || 'select';
+                let requestBody;
+                if (mode === 'manual') {
+                    requestBody = {
+                        source_telegram_chat_id: document.getElementById('create-source-telegram-id').value,
+                        target_telegram_chat_id: document.getElementById('create-target-telegram-id').value,
+                        source_name: document.getElementById('create-source-name').value,
+                        target_name: document.getElementById('create-target-name').value,
+                    };
+                } else {
+                    const source_chat_id = Number(document.getElementById('create-source-chat').value);
+                    const target_chat_id = Number(document.getElementById('create-target-chat').value);
+                    requestBody = { source_chat_id, target_chat_id };
+                }
                 const resp = await fetch('/admin/api/rules', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ source_chat_id, target_chat_id }),
+                    body: JSON.stringify(requestBody),
                 });
-                const payload = await resp.json();
-                if (!resp.ok) throw new Error(payload?.detail || '创建失败');
+                const responsePayload = await resp.json();
+                if (!resp.ok) throw new Error(responsePayload?.detail || '创建失败');
                 closeCreateRuleModal();
                 document.body.dispatchEvent(new CustomEvent('refreshRules'));
-                await loadRule(payload.id);
+                await loadRule(responsePayload.id);
             } catch (e) {
                 setInlineStatus('create-rule-status', e.message || '创建失败', true);
             }
@@ -1594,6 +1662,7 @@
         window.openCreateRuleModal = openCreateRuleModal;
         window.closeCreateRuleModal = closeCreateRuleModal;
         window.createRule = createRule;
+        window.updateCreateModeVisibility = updateCreateModeVisibility;
         window.updateChatsNow = updateChatsNow;
         window.addKeyword = addKeyword;
         window.deleteKeyword = deleteKeyword;

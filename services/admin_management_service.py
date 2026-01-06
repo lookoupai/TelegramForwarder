@@ -27,15 +27,52 @@ class ChatOut(BaseModel):
 
 
 class RuleCreate(BaseModel):
-    source_chat_id: int
-    target_chat_id: int
+    source_chat_id: Optional[int] = None
+    target_chat_id: Optional[int] = None
+    source_telegram_chat_id: Optional[str] = None
+    target_telegram_chat_id: Optional[str] = None
+    source_name: Optional[str] = Field(default=None, max_length=255)
+    target_name: Optional[str] = Field(default=None, max_length=255)
 
-    @validator("target_chat_id")
-    def validate_target_not_same(cls, value: int, values):
+    @validator("source_telegram_chat_id", "target_telegram_chat_id")
+    def normalize_telegram_chat_id(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        trimmed = value.strip()
+        if not trimmed:
+            return None
+        if trimmed.startswith("http") or trimmed.startswith("t.me") or "/" in trimmed or "@" in trimmed:
+            raise ValueError("暂不支持 Telegram 链接/用户名，请填写数字 chat_id（可用 /bind 自动写入）")
+        if not trimmed.lstrip("-").isdigit():
+            raise ValueError("chat_id 必须为数字")
+        return str(int(trimmed))
+
+    @validator("target_chat_id", always=True)
+    def validate_create_mode(cls, _value: Optional[int], values):
         source_chat_id = values.get("source_chat_id")
-        if source_chat_id is not None and value == source_chat_id:
-            raise ValueError("source_chat_id 与 target_chat_id 不能相同")
-        return value
+        target_chat_id = values.get("target_chat_id")
+        source_tid = values.get("source_telegram_chat_id")
+        target_tid = values.get("target_telegram_chat_id")
+
+        by_pk = source_chat_id is not None or target_chat_id is not None
+        by_tid = source_tid is not None or target_tid is not None
+
+        if by_pk and by_tid:
+            raise ValueError("请仅选择一种方式创建：chat_id(下拉) 或 telegram_chat_id(手动)")
+        if by_pk:
+            if source_chat_id is None or target_chat_id is None:
+                raise ValueError("source_chat_id 与 target_chat_id 均为必填")
+            if source_chat_id == target_chat_id:
+                raise ValueError("source_chat_id 与 target_chat_id 不能相同")
+            return target_chat_id
+        if by_tid:
+            if not source_tid or not target_tid:
+                raise ValueError("source_telegram_chat_id 与 target_telegram_chat_id 均为必填")
+            if source_tid == target_tid:
+                raise ValueError("源/目标 chat_id 不能相同")
+            return _value
+
+        raise ValueError("请选择聊天或填写 chat_id")
 
 
 class TemplateSettingsOut(BaseModel):
@@ -166,12 +203,32 @@ def list_chats(session: Session) -> List[ChatOut]:
 
 
 def create_rule(session: Session, payload: RuleCreate) -> ForwardRule:
-    source_chat = session.query(Chat).filter(Chat.id == payload.source_chat_id).first()
-    target_chat = session.query(Chat).filter(Chat.id == payload.target_chat_id).first()
-    if not source_chat:
-        raise ValueError("源聊天不存在")
-    if not target_chat:
-        raise ValueError("目标聊天不存在")
+    if payload.source_chat_id is not None and payload.target_chat_id is not None:
+        source_chat = session.query(Chat).filter(Chat.id == payload.source_chat_id).first()
+        target_chat = session.query(Chat).filter(Chat.id == payload.target_chat_id).first()
+        if not source_chat:
+            raise ValueError("源聊天不存在")
+        if not target_chat:
+            raise ValueError("目标聊天不存在")
+    else:
+        if not payload.source_telegram_chat_id or not payload.target_telegram_chat_id:
+            raise ValueError("source_telegram_chat_id 与 target_telegram_chat_id 均为必填")
+        source_chat = session.query(Chat).filter(Chat.telegram_chat_id == payload.source_telegram_chat_id).first()
+        if not source_chat:
+            source_chat = Chat(
+                telegram_chat_id=payload.source_telegram_chat_id,
+                name=(payload.source_name or None),
+            )
+            session.add(source_chat)
+            session.flush()
+        target_chat = session.query(Chat).filter(Chat.telegram_chat_id == payload.target_telegram_chat_id).first()
+        if not target_chat:
+            target_chat = Chat(
+                telegram_chat_id=payload.target_telegram_chat_id,
+                name=(payload.target_name or None),
+            )
+            session.add(target_chat)
+            session.flush()
 
     rule = ForwardRule(source_chat_id=source_chat.id, target_chat_id=target_chat.id)
     session.add(rule)
