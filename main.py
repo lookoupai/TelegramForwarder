@@ -12,6 +12,8 @@ import multiprocessing
 from models.db_operations import DBOperations
 from scheduler.summary_scheduler import SummaryScheduler
 from scheduler.chat_updater import ChatUpdater
+from scheduler.summary_watcher import watch_summary_settings
+from scheduler.admin_action_worker import run_admin_action_worker
 from handlers.bot_handler import send_welcome_message
 from rss.main import app as rss_app
 from utils.log_config import setup_logging
@@ -39,6 +41,8 @@ db_ops = None
 
 scheduler = None
 chat_updater = None
+summary_watcher_task = None
+admin_action_worker_task = None
 
 
 async def init_db_ops():
@@ -79,7 +83,7 @@ def run_rss_server(host: str, port: int):
 
 async def start_clients():
     # 初始化 DBOperations
-    global db_ops, scheduler, chat_updater
+    global db_ops, scheduler, chat_updater, summary_watcher_task, admin_action_worker_task
     db_ops = await DBOperations.create()
 
     try:
@@ -102,10 +106,16 @@ async def start_clients():
         # 创建并启动调度器
         scheduler = SummaryScheduler(user_client, bot_client)
         await scheduler.start()
-        
+
         # 创建并启动聊天信息更新器
         chat_updater = ChatUpdater(user_client)
         await chat_updater.start()
+
+        # Web 管理页面运行在独立进程：通过主进程轮询 DB 来热更新 AI 总结调度
+        summary_watcher_task = asyncio.create_task(watch_summary_settings(scheduler))
+        admin_action_worker_task = asyncio.create_task(
+            run_admin_action_worker(scheduler=scheduler, db_ops=db_ops, chat_updater=chat_updater)
+        )
 
         # 如果启用了 RSS 服务
         if os.getenv('RSS_ENABLED', '').lower() == 'true':
@@ -139,6 +149,11 @@ async def start_clients():
         # 关闭 DBOperations
         if db_ops and hasattr(db_ops, 'close'):
             await db_ops.close()
+        # 停止 SummaryWatcher
+        if summary_watcher_task:
+            summary_watcher_task.cancel()
+        if admin_action_worker_task:
+            admin_action_worker_task.cancel()
         # 停止调度器
         if scheduler:
             scheduler.stop()

@@ -38,6 +38,15 @@
                     <span class="badge bg-orange-100 text-orange-700">使用 HTMX 局部刷新</span>
                 </div>
 
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div class="text-sm text-slate-500">建议先在 Telegram 里绑定聊天，再在此创建转发规则。</div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <a href="/rss/dashboard" class="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">RSS 管理</a>
+                        <button type="button" onclick="updateChatsNow()" class="rounded-full border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">更新聊天名称</button>
+                        <button type="button" onclick="openCreateRuleModal()" class="rounded-full bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800">新建规则</button>
+                    </div>
+                </div>
+
                 <div id="rules-table" class="card w-full rounded-xl bg-white" hx-get="/admin/view/rules" hx-trigger="load, refreshRules from:body" hx-target="#rules-table" hx-swap="innerHTML">
                     <div class="flex h-48 items-center justify-center text-slate-400">
                         加载规则列表...
@@ -82,8 +91,431 @@
                         </div>
                     </form>
                 </div>
+
+                <div class="mt-8 grid gap-6 lg:grid-cols-2">
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Keywords</p>
+                                <h3 class="text-lg font-semibold text-slate-900">关键字</h3>
+                            </div>
+                            <p id="keywords-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="kw-reverse-blacklist" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="saveKeywordAdvancedSettings()" />
+                                    <span>反转黑名单（黑名单作为第二重白名单）</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="kw-reverse-whitelist" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" onchange="saveKeywordAdvancedSettings()" />
+                                    <span>反转白名单（白名单作为第二重黑名单）</span>
+                                </label>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <input id="keyword-input" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="关键字/正则" />
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="keyword-is-regex" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>正则</span>
+                                </label>
+                                <select id="keyword-mode" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                    <option value="black">黑名单</option>
+                                    <option value="white">白名单</option>
+                                </select>
+                            </div>
+                            <button type="button" onclick="addKeyword()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">添加关键字</button>
+
+                            <div class="overflow-hidden rounded-xl border border-slate-100">
+                                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">内容</th>
+                                            <th class="px-3 py-2 text-left">类型</th>
+                                            <th class="px-3 py-2 text-left">模式</th>
+                                            <th class="px-3 py-2 text-right">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="keywords-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <select id="keyword-copy-target" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2"></select>
+                                <button type="button" onclick="copyKeywordsToRule()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">复制到规则</button>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <button type="button" onclick="exportKeywords()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">导出</button>
+                                <button type="button" onclick="clearAllKeywords()" class="w-full rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:border-red-300">清空</button>
+                                <button type="button" onclick="toggleKeywordBulk()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">批量导入</button>
+                            </div>
+
+                            <div id="keyword-bulk-panel" class="hidden space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-xs text-slate-500">一行一个关键字；导入时按下面“正则/黑白名单”统一应用。</p>
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input id="keyword-bulk-is-regex" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                        <span>正则</span>
+                                    </label>
+                                    <select id="keyword-bulk-mode" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2">
+                                        <option value="black">黑名单</option>
+                                        <option value="white">白名单</option>
+                                    </select>
+                                </div>
+                                <textarea id="keyword-bulk-text" rows="6" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="每行一个关键字"></textarea>
+                                <button type="button" onclick="bulkImportKeywords()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">导入并热更新</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Replace</p>
+                                <h3 class="text-lg font-semibold text-slate-900">替换规则</h3>
+                            </div>
+                            <p id="replace-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <input id="replace-pattern" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="pattern（支持正则，'.*' 为全文替换）" />
+                            <textarea id="replace-content" rows="3" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="替换为（可为空）"></textarea>
+                            <button type="button" onclick="addReplaceRule()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">添加替换规则</button>
+
+                            <div class="overflow-hidden rounded-xl border border-slate-100">
+                                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">Pattern</th>
+                                            <th class="px-3 py-2 text-left">Content</th>
+                                            <th class="px-3 py-2 text-right">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="replace-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                                </table>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <select id="replace-copy-target" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2"></select>
+                                <button type="button" onclick="copyReplaceRulesToRule()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">复制到规则</button>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <button type="button" onclick="exportReplaceRules()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">导出</button>
+                                <button type="button" onclick="clearAllReplaceRules()" class="w-full rounded-xl border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 hover:border-red-300">清空</button>
+                                <button type="button" onclick="toggleReplaceBulk()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">批量导入</button>
+                            </div>
+
+                            <div id="replace-bulk-panel" class="hidden space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+                                <p class="text-xs text-slate-500">一行一条：`pattern => content`；不写 `=>` 则 content 为空。</p>
+                                <textarea id="replace-bulk-text" rows="6" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="例：\\nfoo=>bar\\n.*=>"></textarea>
+                                <button type="button" onclick="bulkImportReplaceRules()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">导入并热更新</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Media</p>
+                                <h3 class="text-lg font-semibold text-slate-900">媒体过滤</h3>
+                            </div>
+                            <p id="media-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-5">
+                            <div class="space-y-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="media-enable-type-filter" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用媒体类型过滤</span>
+                                </label>
+                                <div class="grid gap-2 sm:grid-cols-3">
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="media-type-photo" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>图片</span></label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="media-type-document" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>文件</span></label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="media-type-video" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>视频</span></label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="media-type-audio" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>音频</span></label>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="media-type-voice" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>语音</span></label>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="media-enable-size-filter" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用媒体大小过滤</span>
+                                </label>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <input id="media-max-size" type="number" min="1" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="最大大小（MB）" />
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input id="media-over-size-message" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                        <span>超限时发送提醒</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="space-y-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="media-enable-extension-filter" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用扩展名过滤</span>
+                                </label>
+                                <div class="grid gap-3 sm:grid-cols-2">
+                                    <select id="media-extension-mode" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                        <option value="blacklist">黑名单</option>
+                                        <option value="whitelist">白名单</option>
+                                    </select>
+                                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                        <input id="media-allow-text" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                        <span>媒体被拦截时放行文本</span>
+                                    </label>
+                                </div>
+                                <div class="grid gap-3 sm:grid-cols-3">
+                                    <input id="media-extension-input" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2" placeholder="扩展名（如 jpg / pdf / 无扩展名）" />
+                                    <button type="button" onclick="addMediaExtension()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">添加</button>
+                                </div>
+                                <div id="media-extensions" class="flex flex-wrap gap-2"></div>
+                            </div>
+
+                            <button type="button" onclick="saveMediaSettings()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存媒体设置并热更新</button>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">AI</p>
+                                <h3 class="text-lg font-semibold text-slate-900">AI处理 / AI总结</h3>
+                            </div>
+                            <p id="ai-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-4">
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="ai-enable" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用AI处理</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="ai-upload-image" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>上传图片给AI</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="ai-keyword-after" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>AI后再次关键字过滤</span>
+                                </label>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <select id="ai-model" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
+                                <input id="summary-time" type="time" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                            </div>
+
+                            <textarea id="ai-prompt" rows="4" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="AI处理提示词（留空使用默认）"></textarea>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="summary-enable" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用AI总结</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="summary-top" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>置顶总结消息</span>
+                                </label>
+                            </div>
+
+                            <textarea id="summary-prompt" rows="4" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="AI总结提示词（留空使用默认）"></textarea>
+
+                            <button type="button" onclick="saveAISettings()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存AI设置并热更新</button>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <button type="button" onclick="triggerSummaryNow()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">立即执行本规则总结</button>
+                                <button type="button" onclick="triggerAllSummariesNow()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">立即执行全部总结</button>
+                            </div>
+                            <p class="text-xs text-slate-500">提示：AI总结的定时任务会由主进程自动重调度，无需重启。</p>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Templates</p>
+                                <h3 class="text-lg font-semibold text-slate-900">模板</h3>
+                            </div>
+                            <p id="template-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <textarea id="tpl-userinfo" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="用户信息模板（变量：{name} {id}）"></textarea>
+                            <textarea id="tpl-time" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="时间模板（变量：{time}）"></textarea>
+                            <textarea id="tpl-original-link" rows="2" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="原始链接模板（变量：{original_link}）"></textarea>
+                            <button type="button" onclick="saveTemplates()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存模板并热更新</button>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Sync</p>
+                                <h3 class="text-lg font-semibold text-slate-900">同步目标规则</h3>
+                            </div>
+                            <p id="sync-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <select id="sync-target-rule" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2"></select>
+                                <button type="button" onclick="addSyncRule()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">添加</button>
+                            </div>
+                            <div class="overflow-hidden rounded-xl border border-slate-100">
+                                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">目标规则</th>
+                                            <th class="px-3 py-2 text-right">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="sync-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                                </table>
+                            </div>
+                            <p class="text-xs text-slate-500">说明：开启“启用同步”后，部分设置会自动同步到这里的目标规则。</p>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6 lg:col-span-2">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Push</p>
+                                <h3 class="text-lg font-semibold text-slate-900">推送</h3>
+                            </div>
+                            <p id="push-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-4">
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="push-enable" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>启用推送</span>
+                                </label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="push-only" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                    <span>只推送不转发</span>
+                                </label>
+                                <button type="button" onclick="savePushSettings()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存推送设置</button>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-6">
+                                <input id="push-channel" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-3" placeholder="Apprise 推送地址（push_channel）" />
+                                <select id="push-media-mode" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2">
+                                    <option value="Single">Single（逐个附件）</option>
+                                    <option value="Multiple">Multiple（尽量一次发多个）</option>
+                                </select>
+                                <button type="button" onclick="addPushConfig()" class="w-full rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800 sm:col-span-1">添加</button>
+                            </div>
+
+                            <div class="overflow-hidden rounded-xl border border-slate-100">
+                                <table class="min-w-full divide-y divide-slate-100 text-sm">
+                                    <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                                        <tr>
+                                            <th class="px-3 py-2 text-left">启用</th>
+                                            <th class="px-3 py-2 text-left">push_channel</th>
+                                            <th class="px-3 py-2 text-left">媒体模式</th>
+                                            <th class="px-3 py-2 text-right">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="push-list" class="divide-y divide-slate-100 bg-white"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">UFB</p>
+                                <h3 class="text-lg font-semibold text-slate-900">UFB 同步</h3>
+                            </div>
+                            <p id="ufb-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-3">
+                            <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                <input id="ufb-enable" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                                <span>启用该规则 UFB 同步</span>
+                            </label>
+                            <input id="ufb-domain" type="text" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="domain（例如 example.com）" />
+                            <select id="ufb-item" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                                <option value="main">main</option>
+                                <option value="content">content</option>
+                                <option value="main_username">main_username</option>
+                                <option value="content_username">content_username</option>
+                            </select>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <button type="button" onclick="saveUFBSettings()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存UFB设置</button>
+                                <button type="button" onclick="triggerUFBSyncNow()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">立即同步到UFB</button>
+                            </div>
+                            <p class="text-xs text-slate-500">说明：UFB 依赖主进程的 UFB 客户端连接（由环境变量控制）。</p>
+                        </div>
+                    </div>
+
+                    <div class="card rounded-2xl bg-white p-6 lg:col-span-2">
+                        <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                            <div>
+                                <p class="text-xs uppercase tracking-wider text-slate-400">Copy</p>
+                                <h3 class="text-lg font-semibold text-slate-900">复制规则配置到其他规则</h3>
+                            </div>
+                            <p id="copy-status" class="text-sm text-slate-500"></p>
+                        </div>
+
+                        <div class="mt-4 space-y-4">
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <select id="copy-target-rule" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 sm:col-span-2"></select>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                                    <input id="copy-overwrite" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked />
+                                    <span>覆盖目标数据</span>
+                                </label>
+                            </div>
+
+                            <div class="grid gap-3 sm:grid-cols-3">
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-fields" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked /><span>规则字段</span></label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-keywords" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked /><span>关键字</span></label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-replace" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked /><span>替换规则</span></label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-media" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked /><span>媒体过滤</span></label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-push" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" checked /><span>推送配置</span></label>
+                                <label class="inline-flex items-center gap-2 text-sm text-slate-600"><input id="copy-sync-targets" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" /><span>同步目标</span></label>
+                            </div>
+
+                            <button type="button" onclick="copyRuleToTarget()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">开始复制</button>
+                            <p class="text-xs text-slate-500">说明：不会修改目标规则的源/目标聊天，仅复制配置与关联数据。</p>
+                        </div>
+                    </div>
+                </div>
             </section>
         </main>
+    </div>
+
+    <div id="create-rule-modal" class="fixed inset-0 z-40 hidden items-center justify-center bg-slate-900/40 p-4">
+        <div class="card w-full max-w-xl rounded-2xl bg-white p-6">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                <h3 class="text-lg font-semibold text-slate-900">新建规则</h3>
+                <button type="button" class="text-slate-400 hover:text-slate-700" onclick="closeCreateRuleModal()">×</button>
+            </div>
+            <div class="mt-4 space-y-4">
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-medium text-slate-600">源聊天</label>
+                        <select id="create-source-chat" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <label class="text-sm font-medium text-slate-600">目标聊天</label>
+                        <select id="create-target-chat" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"></select>
+                    </div>
+                </div>
+                <p id="create-rule-status" class="text-sm text-slate-500"></p>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <button type="button" onclick="closeCreateRuleModal()" class="w-full rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-slate-300">取消</button>
+                    <button type="button" onclick="createRule()" class="w-full rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">创建并打开</button>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -99,6 +531,17 @@
                 metaEl.textContent = `规则 #${data.id} ｜ ${data.source_chat_name || '未知'} → ${data.target_chat_name || '未知'}`;
                 document.getElementById('rule-form-panel').classList.remove('hidden');
                 populateForm(data);
+                await Promise.all([
+                    refreshKeywords(),
+                    refreshReplaceRules(),
+                    refreshMediaSettings(),
+                    refreshAISettings(),
+                    refreshTemplates(),
+                    refreshSyncRules(),
+                    refreshPushSettings(),
+                    refreshUFBSettings(),
+                    refreshCopyTargets(),
+                ]);
                 setStatus('');
             } catch (error) {
                 setStatus(error.message || '加载失败', true);
@@ -169,7 +612,1021 @@
             el.className = `mt-2 text-sm ${isError ? 'text-red-600' : 'text-slate-500'}`;
         }
 
+        function setInlineStatus(elementId, message, isError = false) {
+            const el = document.getElementById(elementId);
+            if (!el) return;
+            el.textContent = message || '';
+            el.className = `text-sm ${isError ? 'text-red-600' : 'text-slate-500'}`;
+        }
+
+        async function openCreateRuleModal() {
+            try {
+                const resp = await fetch('/admin/api/chats');
+                const chats = await resp.json();
+                if (!resp.ok) throw new Error(chats?.detail || '加载聊天列表失败');
+                const options = chats.map((c) => `<option value="${c.id}">${escapeHtml(c.name || '未命名')} (#${c.id} / ${escapeHtml(c.telegram_chat_id)})</option>`).join('');
+                document.getElementById('create-source-chat').innerHTML = options;
+                document.getElementById('create-target-chat').innerHTML = options;
+                document.getElementById('create-rule-modal').classList.remove('hidden');
+                document.getElementById('create-rule-modal').classList.add('flex');
+                setInlineStatus('create-rule-status', '');
+            } catch (e) {
+                setInlineStatus('create-rule-status', e.message || '加载失败', true);
+            }
+        }
+
+        function closeCreateRuleModal() {
+            const modal = document.getElementById('create-rule-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function createRule() {
+            try {
+                setInlineStatus('create-rule-status', '创建中...');
+                const source_chat_id = Number(document.getElementById('create-source-chat').value);
+                const target_chat_id = Number(document.getElementById('create-target-chat').value);
+                const resp = await fetch('/admin/api/rules', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_chat_id, target_chat_id }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '创建失败');
+                closeCreateRuleModal();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                await loadRule(payload.id);
+            } catch (e) {
+                setInlineStatus('create-rule-status', e.message || '创建失败', true);
+            }
+        }
+
+        async function deleteRule(ruleId) {
+            if (!ruleId) return;
+            const confirmed = window.confirm(`确认删除规则 #${ruleId}？该操作会删除该规则及其关键字/替换/同步/推送配置。`);
+            if (!confirmed) return;
+            try {
+                setStatus('删除中...');
+                const resp = await fetch(`/admin/api/rules/${ruleId}`, { method: 'DELETE' });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                if (currentRuleId === ruleId) {
+                    currentRuleId = null;
+                    document.getElementById('rule-form-panel').classList.add('hidden');
+                }
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setStatus('已删除');
+            } catch (e) {
+                setStatus(e.message || '删除失败', true);
+            }
+        }
+
+        async function updateChatsNow() {
+            try {
+                setStatus('已提交“更新聊天名称”请求...');
+                const resp = await fetch('/admin/api/chats/update-now', { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '请求失败');
+                setStatus(`已提交（action_id=${payload.action_id}），稍后刷新列表查看效果`);
+            } catch (e) {
+                setStatus(e.message || '请求失败', true);
+            }
+        }
+
+        async function refreshKeywords() {
+            if (!currentRuleId) return;
+            try {
+                const [itemsResp, advResp, rulesResp] = await Promise.all([
+                    fetch(`/admin/api/rules/${currentRuleId}/keywords`),
+                    fetch(`/admin/api/rules/${currentRuleId}/keywords/advanced`),
+                    fetch(`/admin/api/rules`),
+                ]);
+                const items = await itemsResp.json();
+                const adv = await advResp.json();
+                const rules = await rulesResp.json();
+                if (!itemsResp.ok) throw new Error(items?.detail || '加载关键字失败');
+                if (!advResp.ok) throw new Error(adv?.detail || '加载关键字高级设置失败');
+                if (!rulesResp.ok) throw new Error(rules?.detail || '加载规则列表失败');
+                const tbody = document.getElementById('keywords-list');
+                tbody.innerHTML = items.map((k) => `
+                    <tr>
+                        <td class="px-3 py-2 text-slate-900">${escapeHtml(k.keyword || '')}</td>
+                        <td class="px-3 py-2 text-slate-600">${k.is_regex ? '正则' : '普通'}</td>
+                        <td class="px-3 py-2 text-slate-600">${k.is_blacklist ? '黑名单' : '白名单'}</td>
+                        <td class="px-3 py-2 text-right">
+                            <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900" onclick="deleteKeyword(${k.id})">删除</button>
+                        </td>
+                    </tr>
+                `).join('') || `<tr><td colspan="4" class="px-3 py-6 text-center text-slate-400">暂无关键字</td></tr>`;
+                document.getElementById('kw-reverse-blacklist').checked = Boolean(adv.enable_reverse_blacklist);
+                document.getElementById('kw-reverse-whitelist').checked = Boolean(adv.enable_reverse_whitelist);
+                const copySelect = document.getElementById('keyword-copy-target');
+                copySelect.innerHTML = (rules || [])
+                    .filter((r) => r.id !== currentRuleId)
+                    .map((r) => {
+                        const label = `#${r.id} ${r.source_chat_name || '未知'} → ${r.target_chat_name || '未知'}`;
+                        return `<option value="${r.id}">${escapeHtml(label)}</option>`;
+                    })
+                    .join('') || `<option value="">暂无可选规则</option>`;
+
+                setInlineStatus('keywords-status', `共 ${items.length} 条`);
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function addKeyword() {
+            if (!currentRuleId) return;
+            const keyword = document.getElementById('keyword-input').value;
+            const is_regex = document.getElementById('keyword-is-regex').checked;
+            const mode = document.getElementById('keyword-mode').value;
+            const is_blacklist = mode === 'black';
+            try {
+                setInlineStatus('keywords-status', '添加中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keyword, is_regex, is_blacklist }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '添加失败');
+                document.getElementById('keyword-input').value = '';
+                await refreshKeywords();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('keywords-status', '已添加，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '添加失败', true);
+            }
+        }
+
+        async function deleteKeyword(keywordId) {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('keywords-status', '删除中...');
+                const resp = await fetch(`/admin/api/keywords/${keywordId}`, { method: 'DELETE' });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                await refreshKeywords();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('keywords-status', '已删除，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '删除失败', true);
+            }
+        }
+
+        async function saveKeywordAdvancedSettings() {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('keywords-status', '保存高级设置中...');
+                const payload = {
+                    enable_reverse_blacklist: document.getElementById('kw-reverse-blacklist').checked,
+                    enable_reverse_whitelist: document.getElementById('kw-reverse-whitelist').checked,
+                };
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords/advanced`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('keywords-status', '已更新，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '保存失败', true);
+            }
+        }
+
+        function toggleKeywordBulk() {
+            const panel = document.getElementById('keyword-bulk-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        async function bulkImportKeywords() {
+            if (!currentRuleId) return;
+            const raw = document.getElementById('keyword-bulk-text').value || '';
+            const keywords = raw.split('\n').map((x) => x.trim()).filter((x) => x);
+            const is_regex = document.getElementById('keyword-bulk-is-regex').checked;
+            const mode = document.getElementById('keyword-bulk-mode').value;
+            const is_blacklist = mode === 'black';
+            try {
+                setInlineStatus('keywords-status', '导入中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords/bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keywords, is_regex, is_blacklist }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '导入失败');
+                document.getElementById('keyword-bulk-text').value = '';
+                await refreshKeywords();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('keywords-status', `导入完成：新增 ${payload.added}，跳过 ${payload.skipped}`);
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '导入失败', true);
+            }
+        }
+
+        async function clearAllKeywords() {
+            if (!currentRuleId) return;
+            const confirmed = window.confirm('确认清空该规则所有关键字？');
+            if (!confirmed) return;
+            try {
+                setInlineStatus('keywords-status', '清空中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords/clear`, { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '清空失败');
+                await refreshKeywords();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('keywords-status', `已清空：删除 ${payload.deleted}`);
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '清空失败', true);
+            }
+        }
+
+        async function copyKeywordsToRule() {
+            if (!currentRuleId) return;
+            const target_rule_id = Number(document.getElementById('keyword-copy-target').value);
+            if (!target_rule_id) return;
+            try {
+                setInlineStatus('keywords-status', '复制中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords/copy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_rule_id }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '复制失败');
+                setInlineStatus('keywords-status', `复制完成：新增 ${payload.added}，跳过 ${payload.skipped}`);
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '复制失败', true);
+            }
+        }
+
+        async function exportKeywords() {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('keywords-status', '导出中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/keywords/export`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '导出失败');
+                const text = (payload || []).join('\n');
+                await navigator.clipboard.writeText(text);
+                setInlineStatus('keywords-status', `已复制到剪贴板（${payload.length} 行）`);
+            } catch (e) {
+                setInlineStatus('keywords-status', e.message || '导出失败', true);
+            }
+        }
+
+        async function refreshReplaceRules() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules`);
+                if (!resp.ok) throw new Error('加载替换规则失败');
+                const items = await resp.json();
+                const tbody = document.getElementById('replace-list');
+                tbody.innerHTML = items.map((r) => `
+                    <tr>
+                        <td class="px-3 py-2 font-mono text-slate-700">${escapeHtml(r.pattern || '')}</td>
+                        <td class="px-3 py-2 text-slate-600">${escapeHtml(r.content || '')}</td>
+                        <td class="px-3 py-2 text-right">
+                            <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900" onclick="deleteReplaceRule(${r.id})">删除</button>
+                        </td>
+                    </tr>
+                `).join('') || `<tr><td colspan="3" class="px-3 py-6 text-center text-slate-400">暂无替换规则</td></tr>`;
+                const rulesResp = await fetch(`/admin/api/rules`);
+                const rules = await rulesResp.json();
+                if (!rulesResp.ok) throw new Error(rules?.detail || '加载规则列表失败');
+                const copySelect = document.getElementById('replace-copy-target');
+                copySelect.innerHTML = (rules || [])
+                    .filter((r) => r.id !== currentRuleId)
+                    .map((r) => {
+                        const label = `#${r.id} ${r.source_chat_name || '未知'} → ${r.target_chat_name || '未知'}`;
+                        return `<option value="${r.id}">${escapeHtml(label)}</option>`;
+                    })
+                    .join('') || `<option value="">暂无可选规则</option>`;
+
+                setInlineStatus('replace-status', `共 ${items.length} 条`);
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function addReplaceRule() {
+            if (!currentRuleId) return;
+            const pattern = document.getElementById('replace-pattern').value;
+            const content = document.getElementById('replace-content').value;
+            try {
+                setInlineStatus('replace-status', '添加中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pattern, content }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '添加失败');
+                document.getElementById('replace-pattern').value = '';
+                document.getElementById('replace-content').value = '';
+                await refreshReplaceRules();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('replace-status', '已添加，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '添加失败', true);
+            }
+        }
+
+        async function deleteReplaceRule(replaceRuleId) {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('replace-status', '删除中...');
+                const resp = await fetch(`/admin/api/replace-rules/${replaceRuleId}`, { method: 'DELETE' });
+                const payload = await resp.json().catch(() => ({}));
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                await refreshReplaceRules();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('replace-status', '已删除，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '删除失败', true);
+            }
+        }
+
+        function toggleReplaceBulk() {
+            const panel = document.getElementById('replace-bulk-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        function parseReplaceBulkLines(text) {
+            const lines = (text || '').split('\n').map((x) => x.trim()).filter((x) => x);
+            const items = [];
+            for (const line of lines) {
+                const parts = line.split('=>');
+                const pattern = (parts[0] || '').trim();
+                const content = (parts.slice(1).join('=>') || '').trim();
+                if (!pattern) continue;
+                items.push({ pattern, content });
+            }
+            return items;
+        }
+
+        async function bulkImportReplaceRules() {
+            if (!currentRuleId) return;
+            const raw = document.getElementById('replace-bulk-text').value || '';
+            const items = parseReplaceBulkLines(raw);
+            try {
+                setInlineStatus('replace-status', '导入中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules/bulk`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '导入失败');
+                document.getElementById('replace-bulk-text').value = '';
+                await refreshReplaceRules();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('replace-status', `导入完成：新增 ${payload.added}，跳过 ${payload.skipped}`);
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '导入失败', true);
+            }
+        }
+
+        async function clearAllReplaceRules() {
+            if (!currentRuleId) return;
+            const confirmed = window.confirm('确认清空该规则所有替换规则？');
+            if (!confirmed) return;
+            try {
+                setInlineStatus('replace-status', '清空中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules/clear`, { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '清空失败');
+                await refreshReplaceRules();
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('replace-status', `已清空：删除 ${payload.deleted}`);
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '清空失败', true);
+            }
+        }
+
+        async function copyReplaceRulesToRule() {
+            if (!currentRuleId) return;
+            const target_rule_id = Number(document.getElementById('replace-copy-target').value);
+            if (!target_rule_id) return;
+            try {
+                setInlineStatus('replace-status', '复制中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules/copy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ target_rule_id }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '复制失败');
+                setInlineStatus('replace-status', `复制完成：新增 ${payload.added}，跳过 ${payload.skipped}`);
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '复制失败', true);
+            }
+        }
+
+        async function exportReplaceRules() {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('replace-status', '导出中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/replace-rules/export`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '导出失败');
+                const text = (payload || []).join('\n');
+                await navigator.clipboard.writeText(text);
+                setInlineStatus('replace-status', `已复制到剪贴板（${payload.length} 行）`);
+            } catch (e) {
+                setInlineStatus('replace-status', e.message || '导出失败', true);
+            }
+        }
+
+        async function refreshMediaSettings() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/media-settings`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '加载媒体设置失败');
+                document.getElementById('media-enable-type-filter').checked = Boolean(payload.enable_media_type_filter);
+                document.getElementById('media-type-photo').checked = Boolean(payload.media_types?.photo);
+                document.getElementById('media-type-document').checked = Boolean(payload.media_types?.document);
+                document.getElementById('media-type-video').checked = Boolean(payload.media_types?.video);
+                document.getElementById('media-type-audio').checked = Boolean(payload.media_types?.audio);
+                document.getElementById('media-type-voice').checked = Boolean(payload.media_types?.voice);
+                document.getElementById('media-enable-size-filter').checked = Boolean(payload.enable_media_size_filter);
+                document.getElementById('media-max-size').value = payload.max_media_size ?? '';
+                document.getElementById('media-over-size-message').checked = Boolean(payload.is_send_over_media_size_message);
+                document.getElementById('media-enable-extension-filter').checked = Boolean(payload.enable_extension_filter);
+                document.getElementById('media-extension-mode').value = payload.extension_filter_mode || 'blacklist';
+                document.getElementById('media-allow-text').checked = Boolean(payload.media_allow_text);
+                renderMediaExtensions(payload.extensions || []);
+                setInlineStatus('media-status', '已加载');
+            } catch (e) {
+                setInlineStatus('media-status', e.message || '加载失败', true);
+            }
+        }
+
+        function renderMediaExtensions(extensions) {
+            const container = document.getElementById('media-extensions');
+            if (!container) return;
+            if (!extensions.length) {
+                container.innerHTML = '<span class="text-sm text-slate-400">暂无扩展名规则</span>';
+                return;
+            }
+            container.innerHTML = extensions.map((ext) => `
+                <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
+                    <span>${escapeHtml(ext.extension)}</span>
+                    <button type="button" class="text-slate-500 hover:text-slate-900" onclick="deleteMediaExtension(${ext.id})">×</button>
+                </span>
+            `).join('');
+        }
+
+        async function saveMediaSettings() {
+            if (!currentRuleId) return;
+            const payload = {
+                enable_media_type_filter: document.getElementById('media-enable-type-filter').checked,
+                enable_media_size_filter: document.getElementById('media-enable-size-filter').checked,
+                max_media_size: Number(document.getElementById('media-max-size').value || 1),
+                is_send_over_media_size_message: document.getElementById('media-over-size-message').checked,
+                enable_extension_filter: document.getElementById('media-enable-extension-filter').checked,
+                extension_filter_mode: document.getElementById('media-extension-mode').value,
+                media_allow_text: document.getElementById('media-allow-text').checked,
+                media_types: {
+                    photo: document.getElementById('media-type-photo').checked,
+                    document: document.getElementById('media-type-document').checked,
+                    video: document.getElementById('media-type-video').checked,
+                    audio: document.getElementById('media-type-audio').checked,
+                    voice: document.getElementById('media-type-voice').checked,
+                },
+            };
+            try {
+                setInlineStatus('media-status', '保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/media-settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                renderMediaExtensions(result.extensions || []);
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('media-status', '已更新，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('media-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function addMediaExtension() {
+            if (!currentRuleId) return;
+            const extension = document.getElementById('media-extension-input').value;
+            try {
+                setInlineStatus('media-status', '添加扩展名中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/media-extensions`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ extension }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '添加失败');
+                document.getElementById('media-extension-input').value = '';
+                renderMediaExtensions(payload || []);
+                setInlineStatus('media-status', '已添加');
+            } catch (e) {
+                setInlineStatus('media-status', e.message || '添加失败', true);
+            }
+        }
+
+        async function deleteMediaExtension(extensionId) {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('media-status', '删除扩展名中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/media-extensions/${extensionId}`, { method: 'DELETE' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                renderMediaExtensions(payload || []);
+                setInlineStatus('media-status', '已删除');
+            } catch (e) {
+                setInlineStatus('media-status', e.message || '删除失败', true);
+            }
+        }
+
+        async function refreshAISettings() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ai-settings`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '加载AI设置失败');
+
+                const modelSelect = document.getElementById('ai-model');
+                const models = payload.available_models || [];
+                modelSelect.innerHTML = [
+                    `<option value="">默认</option>`,
+                    ...models.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)}</option>`),
+                ].join('');
+                modelSelect.value = payload.ai_model || '';
+
+                document.getElementById('ai-enable').checked = Boolean(payload.is_ai);
+                document.getElementById('ai-upload-image').checked = Boolean(payload.enable_ai_upload_image);
+                document.getElementById('ai-keyword-after').checked = Boolean(payload.is_keyword_after_ai);
+                document.getElementById('ai-prompt').value = payload.ai_prompt || '';
+
+                document.getElementById('summary-enable').checked = Boolean(payload.is_summary);
+                document.getElementById('summary-top').checked = Boolean(payload.is_top_summary);
+                document.getElementById('summary-time').value = (payload.summary_time || '').slice(0, 5);
+                document.getElementById('summary-prompt').value = payload.summary_prompt || '';
+
+                setInlineStatus('ai-status', '已加载');
+            } catch (e) {
+                setInlineStatus('ai-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function saveAISettings() {
+            if (!currentRuleId) return;
+            const payload = {
+                is_ai: document.getElementById('ai-enable').checked,
+                ai_model: document.getElementById('ai-model').value,
+                ai_prompt: document.getElementById('ai-prompt').value,
+                enable_ai_upload_image: document.getElementById('ai-upload-image').checked,
+                is_keyword_after_ai: document.getElementById('ai-keyword-after').checked,
+                is_summary: document.getElementById('summary-enable').checked,
+                summary_time: document.getElementById('summary-time').value,
+                summary_prompt: document.getElementById('summary-prompt').value,
+                is_top_summary: document.getElementById('summary-top').checked,
+            };
+            try {
+                setInlineStatus('ai-status', '保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ai-settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('ai-status', '已更新，下一条消息生效（总结任务会自动重调度）');
+            } catch (e) {
+                setInlineStatus('ai-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function triggerSummaryNow() {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('ai-status', '已提交“立即总结”请求...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ai-summary-now`, { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '请求失败');
+                setInlineStatus('ai-status', `已提交（action_id=${payload.action_id}），稍后在目标群查看结果`);
+            } catch (e) {
+                setInlineStatus('ai-status', e.message || '请求失败', true);
+            }
+        }
+
+        async function triggerAllSummariesNow() {
+            try {
+                setInlineStatus('ai-status', '已提交“全部立即总结”请求...');
+                const resp = await fetch(`/admin/api/ai-summary/execute-all`, { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '请求失败');
+                setInlineStatus('ai-status', `已提交（action_id=${payload.action_id}），稍后查看各目标群结果`);
+            } catch (e) {
+                setInlineStatus('ai-status', e.message || '请求失败', true);
+            }
+        }
+
+        async function refreshUFBSettings() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ufb-settings`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '加载UFB设置失败');
+                document.getElementById('ufb-enable').checked = Boolean(payload.is_ufb);
+                document.getElementById('ufb-domain').value = payload.ufb_domain || '';
+                document.getElementById('ufb-item').value = payload.ufb_item || 'main';
+                setInlineStatus('ufb-status', '已加载');
+            } catch (e) {
+                setInlineStatus('ufb-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function saveUFBSettings() {
+            if (!currentRuleId) return;
+            const payload = {
+                is_ufb: document.getElementById('ufb-enable').checked,
+                ufb_domain: document.getElementById('ufb-domain').value,
+                ufb_item: document.getElementById('ufb-item').value,
+            };
+            try {
+                setInlineStatus('ufb-status', '保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ufb-settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                setInlineStatus('ufb-status', '已更新');
+            } catch (e) {
+                setInlineStatus('ufb-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function triggerUFBSyncNow() {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('ufb-status', '已提交同步请求...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/ufb-sync-now`, { method: 'POST' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '请求失败');
+                setInlineStatus('ufb-status', `已提交（action_id=${payload.action_id}）`);
+            } catch (e) {
+                setInlineStatus('ufb-status', e.message || '请求失败', true);
+            }
+        }
+
+        async function refreshTemplates() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/templates`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '加载模板失败');
+                document.getElementById('tpl-userinfo').value = payload.userinfo_template || '';
+                document.getElementById('tpl-time').value = payload.time_template || '';
+                document.getElementById('tpl-original-link').value = payload.original_link_template || '';
+                setInlineStatus('template-status', '已加载');
+            } catch (e) {
+                setInlineStatus('template-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function saveTemplates() {
+            if (!currentRuleId) return;
+            const payload = {
+                userinfo_template: document.getElementById('tpl-userinfo').value,
+                time_template: document.getElementById('tpl-time').value,
+                original_link_template: document.getElementById('tpl-original-link').value,
+            };
+            try {
+                setInlineStatus('template-status', '保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/templates`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                setInlineStatus('template-status', '已更新，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('template-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function refreshSyncRules() {
+            if (!currentRuleId) return;
+            try {
+                const [rulesResp, syncResp] = await Promise.all([
+                    fetch('/admin/api/rules'),
+                    fetch(`/admin/api/rules/${currentRuleId}/sync-rules`),
+                ]);
+                const rules = await rulesResp.json();
+                const syncRows = await syncResp.json();
+                if (!rulesResp.ok) throw new Error(rules?.detail || '加载规则列表失败');
+                if (!syncResp.ok) throw new Error(syncRows?.detail || '加载同步列表失败');
+
+                const select = document.getElementById('sync-target-rule');
+                const options = (rules || [])
+                    .filter((r) => r.id !== currentRuleId)
+                    .map((r) => {
+                        const label = `#${r.id} ${r.source_chat_name || '未知'} → ${r.target_chat_name || '未知'}`;
+                        return `<option value="${r.id}">${escapeHtml(label)}</option>`;
+                    })
+                    .join('');
+                select.innerHTML = options || `<option value="">暂无可选规则</option>`;
+
+                const tbody = document.getElementById('sync-list');
+                tbody.innerHTML = (syncRows || []).map((row) => {
+                    const label = `#${row.sync_rule_id} ${row.source_chat_name || '未知'} → ${row.target_chat_name || '未知'}`;
+                    return `
+                        <tr>
+                            <td class="px-3 py-2 text-slate-700">${escapeHtml(label)}</td>
+                            <td class="px-3 py-2 text-right">
+                                <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900" onclick="deleteSyncRule(${row.id})">删除</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('') || `<tr><td colspan="2" class="px-3 py-6 text-center text-slate-400">暂无同步目标</td></tr>`;
+
+                setInlineStatus('sync-status', `共 ${(syncRows || []).length} 条`);
+            } catch (e) {
+                setInlineStatus('sync-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function addSyncRule() {
+            if (!currentRuleId) return;
+            const sync_rule_id = Number(document.getElementById('sync-target-rule').value);
+            if (!sync_rule_id) return;
+            try {
+                setInlineStatus('sync-status', '添加中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/sync-rules`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ sync_rule_id }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '添加失败');
+                await refreshSyncRules();
+                setInlineStatus('sync-status', '已添加');
+            } catch (e) {
+                setInlineStatus('sync-status', e.message || '添加失败', true);
+            }
+        }
+
+        async function deleteSyncRule(ruleSyncId) {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('sync-status', '删除中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/sync-rules/${ruleSyncId}`, { method: 'DELETE' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                await refreshSyncRules();
+                setInlineStatus('sync-status', '已删除');
+            } catch (e) {
+                setInlineStatus('sync-status', e.message || '删除失败', true);
+            }
+        }
+
+        async function refreshCopyTargets() {
+            if (!currentRuleId) return;
+            try {
+                const rulesResp = await fetch('/admin/api/rules');
+                const rules = await rulesResp.json();
+                if (!rulesResp.ok) throw new Error(rules?.detail || '加载规则列表失败');
+                const select = document.getElementById('copy-target-rule');
+                select.innerHTML = (rules || [])
+                    .filter((r) => r.id !== currentRuleId)
+                    .map((r) => {
+                        const label = `#${r.id} ${r.source_chat_name || '未知'} → ${r.target_chat_name || '未知'}`;
+                        return `<option value="${r.id}">${escapeHtml(label)}</option>`;
+                    })
+                    .join('') || `<option value="">暂无可选规则</option>`;
+                setInlineStatus('copy-status', '已加载');
+            } catch (e) {
+                setInlineStatus('copy-status', e.message || '加载失败', true);
+            }
+        }
+
+        async function copyRuleToTarget() {
+            if (!currentRuleId) return;
+            const target_rule_id = Number(document.getElementById('copy-target-rule').value);
+            if (!target_rule_id) return;
+            const confirmed = window.confirm(`确认将当前规则配置复制到规则 #${target_rule_id}？`);
+            if (!confirmed) return;
+            const payload = {
+                target_rule_id,
+                overwrite: document.getElementById('copy-overwrite').checked,
+                copy_rule_fields: document.getElementById('copy-fields').checked,
+                copy_keywords: document.getElementById('copy-keywords').checked,
+                copy_replace_rules: document.getElementById('copy-replace').checked,
+                copy_media: document.getElementById('copy-media').checked,
+                copy_push: document.getElementById('copy-push').checked,
+                copy_sync_targets: document.getElementById('copy-sync-targets').checked,
+            };
+            try {
+                setInlineStatus('copy-status', '复制中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/copy-to`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '复制失败');
+                setInlineStatus(
+                    'copy-status',
+                    `完成：fields=${result.copied_fields} kw=${result.keywords_added} repl=${result.replace_rules_added} ext=${result.media_extensions_added} push=${result.push_configs_added} sync=${result.sync_targets_added}`
+                );
+            } catch (e) {
+                setInlineStatus('copy-status', e.message || '复制失败', true);
+            }
+        }
+
+        async function refreshPushSettings() {
+            if (!currentRuleId) return;
+            try {
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/push-settings`);
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '加载推送设置失败');
+                document.getElementById('push-enable').checked = Boolean(payload.enable_push);
+                document.getElementById('push-only').checked = Boolean(payload.enable_only_push);
+                renderPushConfigs(payload.configs || []);
+                setInlineStatus('push-status', '已加载');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '加载失败', true);
+            }
+        }
+
+        function renderPushConfigs(configs) {
+            const tbody = document.getElementById('push-list');
+            tbody.innerHTML = (configs || []).map((c) => `
+                <tr>
+                    <td class="px-3 py-2">
+                        <input type="checkbox" ${c.enable_push_channel ? 'checked' : ''} onchange="togglePushConfig(${c.id}, this.checked)" class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                    </td>
+                    <td class="px-3 py-2">
+                        <input id="push-channel-${c.id}" type="text" value="${escapeHtml(c.push_channel)}" class="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" />
+                    </td>
+                    <td class="px-3 py-2">
+                        <select id="push-mode-${c.id}" class="w-full rounded-lg border border-slate-200 px-2 py-1 text-sm text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="Single" ${c.media_send_mode === 'Single' ? 'selected' : ''}>Single</option>
+                            <option value="Multiple" ${c.media_send_mode === 'Multiple' ? 'selected' : ''}>Multiple</option>
+                        </select>
+                    </td>
+                    <td class="px-3 py-2 text-right">
+                        <button type="button" class="rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 hover:border-slate-300 hover:text-slate-900" onclick="savePushConfig(${c.id})">保存</button>
+                        <button type="button" class="ml-2 rounded-full border border-red-200 px-3 py-1 text-xs font-semibold text-red-600 hover:border-red-300 hover:text-red-700" onclick="deletePushConfig(${c.id})">删除</button>
+                    </td>
+                </tr>
+            `).join('') || `<tr><td colspan="4" class="px-3 py-6 text-center text-slate-400">暂无推送配置</td></tr>`;
+        }
+
+        async function savePushSettings() {
+            if (!currentRuleId) return;
+            const payload = {
+                enable_push: document.getElementById('push-enable').checked,
+                enable_only_push: document.getElementById('push-only').checked,
+            };
+            try {
+                setInlineStatus('push-status', '保存中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/push-settings`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+                const result = await resp.json();
+                if (!resp.ok) throw new Error(result?.detail || '保存失败');
+                renderPushConfigs(result.configs || []);
+                document.body.dispatchEvent(new CustomEvent('refreshRules'));
+                setInlineStatus('push-status', '已更新，下一条消息生效');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function addPushConfig() {
+            if (!currentRuleId) return;
+            const push_channel = document.getElementById('push-channel').value;
+            const media_send_mode = document.getElementById('push-media-mode').value;
+            try {
+                setInlineStatus('push-status', '添加中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/push-configs`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ push_channel, media_send_mode, enable_push_channel: true }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '添加失败');
+                document.getElementById('push-channel').value = '';
+                renderPushConfigs(payload.configs || []);
+                setInlineStatus('push-status', '已添加');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '添加失败', true);
+            }
+        }
+
+        async function togglePushConfig(pushConfigId, enabled) {
+            try {
+                const resp = await fetch(`/admin/api/push-configs/${pushConfigId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enable_push_channel: enabled }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '更新失败');
+                setInlineStatus('push-status', '已更新');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '更新失败', true);
+            }
+        }
+
+        async function savePushConfig(pushConfigId) {
+            try {
+                setInlineStatus('push-status', '保存中...');
+                const push_channel = document.getElementById(`push-channel-${pushConfigId}`).value;
+                const media_send_mode = document.getElementById(`push-mode-${pushConfigId}`).value;
+                const resp = await fetch(`/admin/api/push-configs/${pushConfigId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ push_channel, media_send_mode }),
+                });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '保存失败');
+                setInlineStatus('push-status', '已保存');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '保存失败', true);
+            }
+        }
+
+        async function deletePushConfig(pushConfigId) {
+            if (!currentRuleId) return;
+            try {
+                setInlineStatus('push-status', '删除中...');
+                const resp = await fetch(`/admin/api/rules/${currentRuleId}/push-configs/${pushConfigId}`, { method: 'DELETE' });
+                const payload = await resp.json();
+                if (!resp.ok) throw new Error(payload?.detail || '删除失败');
+                renderPushConfigs(payload.configs || []);
+                setInlineStatus('push-status', '已删除');
+            } catch (e) {
+                setInlineStatus('push-status', e.message || '删除失败', true);
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
         window.loadRule = loadRule;
+        window.deleteRule = deleteRule;
+        window.openCreateRuleModal = openCreateRuleModal;
+        window.closeCreateRuleModal = closeCreateRuleModal;
+        window.createRule = createRule;
+        window.updateChatsNow = updateChatsNow;
+        window.addKeyword = addKeyword;
+        window.deleteKeyword = deleteKeyword;
+        window.saveKeywordAdvancedSettings = saveKeywordAdvancedSettings;
+        window.toggleKeywordBulk = toggleKeywordBulk;
+        window.bulkImportKeywords = bulkImportKeywords;
+        window.clearAllKeywords = clearAllKeywords;
+        window.copyKeywordsToRule = copyKeywordsToRule;
+        window.exportKeywords = exportKeywords;
+        window.addReplaceRule = addReplaceRule;
+        window.deleteReplaceRule = deleteReplaceRule;
+        window.toggleReplaceBulk = toggleReplaceBulk;
+        window.bulkImportReplaceRules = bulkImportReplaceRules;
+        window.clearAllReplaceRules = clearAllReplaceRules;
+        window.copyReplaceRulesToRule = copyReplaceRulesToRule;
+        window.exportReplaceRules = exportReplaceRules;
+        window.saveMediaSettings = saveMediaSettings;
+        window.addMediaExtension = addMediaExtension;
+        window.deleteMediaExtension = deleteMediaExtension;
+        window.saveAISettings = saveAISettings;
+        window.triggerSummaryNow = triggerSummaryNow;
+        window.triggerAllSummariesNow = triggerAllSummariesNow;
+        window.saveTemplates = saveTemplates;
+        window.addSyncRule = addSyncRule;
+        window.deleteSyncRule = deleteSyncRule;
+        window.copyRuleToTarget = copyRuleToTarget;
+        window.savePushSettings = savePushSettings;
+        window.addPushConfig = addPushConfig;
+        window.togglePushConfig = togglePushConfig;
+        window.savePushConfig = savePushConfig;
+        window.deletePushConfig = deletePushConfig;
+        window.saveUFBSettings = saveUFBSettings;
+        window.triggerUFBSyncNow = triggerUFBSyncNow;
     </script>
 </body>
 </html>
