@@ -3,6 +3,7 @@ import anthropic
 from .base import BaseAIProvider
 import os
 import logging
+from utils.settings import load_ai_providers
 
 logger = logging.getLogger(__name__)
 
@@ -14,12 +15,21 @@ class ClaudeProvider(BaseAIProvider):
         
     async def initialize(self, **kwargs):
         """初始化Claude客户端"""
-        api_key = os.getenv('CLAUDE_API_KEY')
+        providers_config = load_ai_providers(type="dict")
+        provider_meta = providers_config.get("claude", {}) if isinstance(providers_config, dict) else {}
+        if provider_meta and provider_meta.get("enabled") is False:
+            raise ValueError("AI提供商已禁用: claude")
+
+        api_key = (provider_meta.get("api_key") or "").strip() if isinstance(provider_meta, dict) else ""
         if not api_key:
-            raise ValueError("未设置CLAUDE_API_KEY环境变量")
+            api_key = os.getenv('CLAUDE_API_KEY', '').strip()
+        if not api_key:
+            raise ValueError("未配置 claude 的 api_key（或 CLAUDE_API_KEY 环境变量）")
             
         # 检查是否配置了自定义API基础URL
-        api_base = os.getenv('CLAUDE_API_BASE', '').strip()
+        api_base = (provider_meta.get("api_base") or "").strip() if isinstance(provider_meta, dict) else ""
+        if not api_base:
+            api_base = os.getenv('CLAUDE_API_BASE', '').strip()
         if api_base:
             logger.info(f"使用自定义Claude API基础URL: {api_base}")
             self.client = anthropic.Anthropic(

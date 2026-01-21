@@ -7,6 +7,7 @@ from .openai_base_provider import OpenAIBaseProvider
 import os
 import logging
 import base64
+from utils.settings import load_ai_providers
 
 logger = logging.getLogger(__name__)
 
@@ -15,6 +16,7 @@ class GeminiOpenAIProvider(OpenAIBaseProvider):
     def __init__(self):
         super().__init__(
             env_prefix='GEMINI',
+            provider_key='gemini',
             default_model='gemini-pro',
             default_api_base=''  # API_BASE必须在环境变量中提供
         )
@@ -27,19 +29,30 @@ class GeminiProvider(BaseAIProvider):
         
     async def initialize(self, **kwargs):
         """初始化Gemini客户端"""
-        # 检查是否配置了GEMINI_API_BASE，如果有则使用兼容OpenAI的接口
-        api_base = os.getenv('GEMINI_API_BASE', '').strip()
+        providers_config = load_ai_providers(type="dict")
+        provider_meta = providers_config.get("gemini", {}) if isinstance(providers_config, dict) else {}
+        if provider_meta and provider_meta.get("enabled") is False:
+            raise ValueError("AI提供商已禁用: gemini")
+
+        provider_type = (provider_meta.get("type") or "gemini_native").strip() if isinstance(provider_meta, dict) else "gemini_native"
+
+        api_base = (provider_meta.get("api_base") or "").strip() if isinstance(provider_meta, dict) else ""
+        if not api_base:
+            api_base = os.getenv('GEMINI_API_BASE', '').strip()
         
-        if api_base:
-            logger.info(f"检测到GEMINI_API_BASE环境变量: {api_base}，使用兼容OpenAI的接口")
+        if provider_type == "openai_compatible" or api_base:
+            if api_base:
+                logger.info(f"检测到Gemini OpenAI-Compatible API_BASE: {api_base}，使用兼容OpenAI的接口")
             self.provider = GeminiOpenAIProvider()
             await self.provider.initialize(**kwargs)
             return
             
         # 原来的Gemini API初始化代码
-        api_key = os.getenv('GEMINI_API_KEY')
+        api_key = (provider_meta.get("api_key") or "").strip() if isinstance(provider_meta, dict) else ""
         if not api_key:
-            raise ValueError("未设置GEMINI_API_KEY环境变量")
+            api_key = os.getenv('GEMINI_API_KEY', '').strip()
+        if not api_key:
+            raise ValueError("未配置 gemini 的 api_key（或 GEMINI_API_KEY 环境变量）")
 
         # 使用传入的model参数，如果没有才使用默认值
         if not self.model_name:  # 如果model_name还没设置

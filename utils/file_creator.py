@@ -73,6 +73,49 @@ AI_MODELS_CONFIG = {
     ]
 }
 
+# 默认AI提供商配置(JSON格式)
+# 说明：
+# - api_key 允许留空：运行时将回退读取环境变量（如 OPENAI_API_KEY）
+# - api_base 允许留空：OpenAI 将使用默认官方地址；其他 OpenAI-Compatible 建议填写
+AI_PROVIDERS_CONFIG = {
+    "openai": {
+        "type": "openai_compatible",
+        "enabled": True,
+        "api_base": "https://api.openai.com/v1",
+        "api_key": "",
+    },
+    "deepseek": {
+        "type": "openai_compatible",
+        "enabled": True,
+        "api_base": "https://api.deepseek.com/v1",
+        "api_key": "",
+    },
+    "qwen": {
+        "type": "openai_compatible",
+        "enabled": True,
+        "api_base": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "api_key": "",
+    },
+    "grok": {
+        "type": "openai_compatible",
+        "enabled": True,
+        "api_base": "https://api.x.ai/v1",
+        "api_key": "",
+    },
+    "gemini": {
+        "type": "gemini_native",
+        "enabled": True,
+        "api_base": "",
+        "api_key": "",
+    },
+    "claude": {
+        "type": "claude",
+        "enabled": True,
+        "api_base": "",
+        "api_key": "",
+    },
+}
+
 # 汇总时间列表
 SUMMARY_TIMES_CONTENT = """00:00
 00:30
@@ -279,3 +322,13 @@ def create_default_configs():
             logger.info("Created ai_models.json")
         except Exception as e:
             logger.error(f"创建 ai_models.json 失败: {e}") 
+
+    # 创建JSON格式的AI提供商配置文件
+    providers_config_path = os.path.join(config_dir, 'ai_providers.json')
+    if not os.path.exists(providers_config_path):
+        try:
+            with open(providers_config_path, 'w', encoding='utf-8') as f:
+                json.dump(AI_PROVIDERS_CONFIG, f, ensure_ascii=False, indent=4)
+            logger.info("Created ai_providers.json")
+        except Exception as e:
+            logger.error(f"创建 ai_providers.json 失败: {e}")

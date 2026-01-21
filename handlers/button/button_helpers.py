@@ -1,17 +1,12 @@
 from telethon import Button
 from utils.constants import *
 from utils.settings import load_summary_times, load_ai_models, load_delay_times, load_max_media_size, load_media_extensions
-from handlers.button.settings_manager import AI_SETTINGS, AI_MODELS, MEDIA_SETTINGS,OTHER_SETTINGS, PUSH_SETTINGS
+from handlers.button.settings_manager import AI_SETTINGS, MEDIA_SETTINGS,OTHER_SETTINGS, PUSH_SETTINGS
 from utils.common import get_db_ops
 from models.models import get_session
 from sqlalchemy import text
 from models.models import ForwardRule
 
-SUMMARY_TIMES = load_summary_times()
-AI_MODELS= load_ai_models()
-DELAY_TIMES = load_delay_times()
-MEDIA_SIZE = load_max_media_size()
-MEDIA_EXTENSIONS = load_media_extensions()
 async def create_ai_settings_buttons(rule=None,rule_id=None):
     """创建 AI 设置按钮"""
     buttons = []
@@ -174,7 +169,8 @@ async def create_model_buttons(rule_id, page=0):
         page: 当前页码（从0开始）
     """
     buttons = []
-    total_models = len(AI_MODELS)
+    models = load_ai_models()
+    total_models = len(models)
     total_pages = (total_models + MODELS_PER_PAGE - 1) // MODELS_PER_PAGE
 
     # 计算当前页的模型范围
@@ -182,7 +178,7 @@ async def create_model_buttons(rule_id, page=0):
     end_idx = min(start_idx + MODELS_PER_PAGE, total_models)
 
     # 添加模型按钮
-    for model in AI_MODELS[start_idx:end_idx]:
+    for model in models[start_idx:end_idx]:
         buttons.append([Button.inline(f"{model}", f"select_model:{rule_id}:{model}")])
 
     # 添加导航按钮
@@ -210,17 +206,18 @@ async def create_summary_time_buttons(rule_id, page=0):
     times_per_page = rows * cols
 
     buttons = []
-    total_times = len(SUMMARY_TIMES)
+    summary_times = load_summary_times()
+    total_times = len(summary_times)
     start_idx = page * times_per_page
     end_idx = min(start_idx + times_per_page, total_times)
 
     # 检查是否是频道消息
     buttons = []
-    total_times = len(SUMMARY_TIMES)
+    total_times = len(summary_times)
 
     # 添加时间按钮
     current_row = []
-    for i, time in enumerate(SUMMARY_TIMES[start_idx:end_idx], start=1):
+    for i, time in enumerate(summary_times[start_idx:end_idx], start=1):
         current_row.append(Button.inline(
             time,
             f"select_time:{rule_id}:{time}"
@@ -271,17 +268,18 @@ async def create_media_size_buttons(rule_id, page=0):
     size_select_per_page = rows * cols
 
     buttons = []
-    total_size = len(MEDIA_SIZE)
+    media_size = load_max_media_size()
+    total_size = len(media_size)
     start_idx = page * size_select_per_page
     end_idx = min(start_idx + size_select_per_page, total_size)
 
     # 检查是否是频道消息
     buttons = []
-    total_size = len(MEDIA_SIZE)
+    total_size = len(media_size)
 
     # 添加媒体大小按钮
     current_row = []
-    for i, size in enumerate(MEDIA_SIZE[start_idx:end_idx], start=1):
+    for i, size in enumerate(media_size[start_idx:end_idx], start=1):
         current_row.append(Button.inline(
             str(size),
             f"select_max_media_size:{rule_id}:{size}"
@@ -333,17 +331,18 @@ async def create_delay_time_buttons(rule_id, page=0):
     times_per_page = rows * cols
 
     buttons = []
-    total_times = len(DELAY_TIMES)
+    delay_times = load_delay_times()
+    total_times = len(delay_times)
     start_idx = page * times_per_page
     end_idx = min(start_idx + times_per_page, total_times)
 
     # 检查是否是频道消息
     buttons = []
-    total_times = len(DELAY_TIMES)
+    total_times = len(delay_times)
 
     # 添加时间按钮
     current_row = []
-    for i, time in enumerate(DELAY_TIMES[start_idx:end_idx], start=1):
+    for i, time in enumerate(delay_times[start_idx:end_idx], start=1):
         current_row.append(Button.inline(
             str(time),
             f"select_delay_time:{rule_id}:{time}"
@@ -440,8 +439,9 @@ async def create_media_extensions_buttons(rule_id, page=0):
     
     extensions_per_page = rows * cols
     
+    media_extensions = load_media_extensions()
     buttons = []
-    total_extensions = len(MEDIA_EXTENSIONS)
+    total_extensions = len(media_extensions)
     start_idx = page * extensions_per_page
     end_idx = min(start_idx + extensions_per_page, total_extensions)
     
@@ -457,7 +457,7 @@ async def create_media_extensions_buttons(rule_id, page=0):
         # 创建扩展名按钮
         current_row = []
         for i in range(start_idx, end_idx):
-            ext = MEDIA_EXTENSIONS[i]
+            ext = media_extensions[i]
             # 检查是否已选择
             is_selected = ext in selected_extension_list
             button_text = f"{'✅ ' if is_selected else ''}{ext}"

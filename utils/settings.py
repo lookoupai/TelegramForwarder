@@ -2,9 +2,77 @@ import os
 import json
 import logging
 
-from utils.file_creator import create_default_configs, AI_MODELS_CONFIG
+from utils.file_creator import create_default_configs, AI_MODELS_CONFIG, AI_PROVIDERS_CONFIG
 
 logger = logging.getLogger(__name__)
+
+_JSON_CACHE = {}
+
+
+def _get_config_path(filename: str) -> str:
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', filename)
+
+
+def _load_json_cached(path: str, default):
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return default
+
+    cached = _JSON_CACHE.get(path)
+    if cached and cached.get("mtime") == mtime:
+        return cached.get("value", default)
+
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            value = json.load(f)
+        _JSON_CACHE[path] = {"mtime": mtime, "value": value}
+        return value
+    except (FileNotFoundError, IOError, json.JSONDecodeError) as e:
+        logger.error(f"加载JSON配置失败: {path}, error={e}")
+        return default
+
+
+def _atomic_write_json(path: str, value) -> None:
+    dir_path = os.path.dirname(path)
+    os.makedirs(dir_path, exist_ok=True)
+    tmp_path = f"{path}.tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
+        json.dump(value, f, ensure_ascii=False, indent=4)
+    os.replace(tmp_path, path)
+    try:
+        os.chmod(path, 0o600)
+    except Exception:
+        return
+
+
+def load_ai_providers(type: str = "dict"):
+    """
+    加载AI提供商配置
+
+    参数:
+        type (str): 返回类型
+            - "dict"/"json": 返回 {provider: {type, enabled, api_base, api_key}}
+    """
+    providers_path = _get_config_path('ai_providers.json')
+    if not os.path.exists(providers_path):
+        create_default_configs()
+
+    providers_config = _load_json_cached(providers_path, AI_PROVIDERS_CONFIG)
+    if type.lower() in ["dict", "json"]:
+        if isinstance(providers_config, dict):
+            return providers_config
+        return AI_PROVIDERS_CONFIG
+    return providers_config
+
+
+def save_ai_providers(providers_config: dict) -> dict:
+    """保存AI提供商配置（原子写入，避免写一半导致JSON损坏）"""
+    providers_path = _get_config_path('ai_providers.json')
+    _atomic_write_json(providers_path, providers_config)
+    _JSON_CACHE.pop(providers_path, None)
+    return providers_config
+
 
 def load_ai_models(type="list"):
     """
@@ -19,28 +87,28 @@ def load_ai_models(type="list"):
         根据type参数返回不同格式的模型配置
     """
     try:
-        models_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'config', 'ai_models.json')
+        models_path = _get_config_path('ai_models.json')
         
         # 如果配置文件不存在，创建默认配置
         if not os.path.exists(models_path):
             create_default_configs()
             
-        # 读取JSON配置文件
-        with open(models_path, 'r', encoding='utf-8') as f:
-            models_config = json.load(f)
+        models_config = _load_json_cached(models_path, AI_MODELS_CONFIG)
             
-            # 根据type参数返回不同格式
-            if type.lower() in ["dict", "json"]:
-                return models_config
+        # 根据type参数返回不同格式
+        if type.lower() in ["dict", "json"]:
+            return models_config
             
-            # 默认返回模型列表
-            all_models = []
-            for provider, models in models_config.items():
-                all_models.extend(models)
+        # 默认返回模型列表
+        all_models = []
+        for provider, models in (models_config or {}).items():
+            if not isinstance(models, list):
+                continue
+            all_models.extend([str(m).strip() for m in models if str(m).strip()])
                 
-            # 确保列表不为空
-            if all_models:
-                return all_models
+        # 确保列表不为空
+        if all_models:
+            return all_models
                 
     except (FileNotFoundError, IOError, json.JSONDecodeError) as e:
         logger.error(f"加载AI模型配置失败: {e}")
@@ -51,6 +119,14 @@ def load_ai_models(type="list"):
     
     # 默认返回模型列表
     return ["gpt-3.5-turbo", "gemini-1.5-flash", "claude-3-sonnet"]
+
+
+def save_ai_models(models_config: dict) -> dict:
+    """保存AI模型配置（原子写入，避免写一半导致JSON损坏）"""
+    models_path = _get_config_path('ai_models.json')
+    _atomic_write_json(models_path, models_config)
+    _JSON_CACHE.pop(models_path, None)
+    return models_config
 
 def load_summary_times():
     """加载总结时间列表"""

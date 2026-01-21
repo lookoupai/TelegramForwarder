@@ -3,12 +3,13 @@ from openai import AsyncOpenAI
 from .base import BaseAIProvider
 import os
 import logging
+from utils.settings import load_ai_providers
 
 logger = logging.getLogger(__name__)
 
 class OpenAIBaseProvider(BaseAIProvider):
     def __init__(self, env_prefix: str = 'OPENAI', default_model: str = 'gpt-4o-mini',
-                 default_api_base: str = 'https://api.openai.com/v1'):
+                 default_api_base: str = 'https://api.openai.com/v1', provider_key: Optional[str] = None):
         """
         初始化基础OpenAI格式提供者
 
@@ -16,9 +17,11 @@ class OpenAIBaseProvider(BaseAIProvider):
             env_prefix: 环境变量前缀，如 'OPENAI', 'GROK', 'DEEPSEEK', 'QWEN'
             default_model: 默认模型名称
             default_api_base: 默认API基础URL
+            provider_key: ai_providers.json 中的提供商键名（用于后台热更新）
         """
         super().__init__()
         self.env_prefix = env_prefix
+        self.provider_key = (provider_key or env_prefix).strip().lower()
         self.default_model = default_model
         self.default_api_base = default_api_base
         self.client = None
@@ -27,11 +30,24 @@ class OpenAIBaseProvider(BaseAIProvider):
     async def initialize(self, **kwargs) -> None:
         """初始化OpenAI客户端"""
         try:
-            api_key = os.getenv(f'{self.env_prefix}_API_KEY')
-            if not api_key:
-                raise ValueError(f"未设置 {self.env_prefix}_API_KEY 环境变量")
+            providers_config = load_ai_providers(type="dict")
+            provider_config = providers_config.get(self.provider_key, {}) if isinstance(providers_config, dict) else {}
 
-            api_base = os.getenv(f'{self.env_prefix}_API_BASE', '').strip() or self.default_api_base
+            if provider_config and provider_config.get("enabled") is False:
+                raise ValueError(f"AI提供商已禁用: {self.provider_key}")
+
+            api_key = (provider_config.get("api_key") or "").strip() if isinstance(provider_config, dict) else ""
+            if not api_key:
+                api_key = os.getenv(f'{self.env_prefix}_API_KEY', '').strip()
+            if not api_key:
+                raise ValueError(f"未设置 {self.provider_key} 的 api_key（或 {self.env_prefix}_API_KEY 环境变量）")
+
+            api_base = (provider_config.get("api_base") or "").strip() if isinstance(provider_config, dict) else ""
+            if not api_base:
+                api_base = os.getenv(f'{self.env_prefix}_API_BASE', '').strip()
+            api_base = api_base or (self.default_api_base or "").strip()
+            if not api_base:
+                raise ValueError(f"未设置 {self.provider_key} 的 api_base（或 {self.env_prefix}_API_BASE 环境变量）")
 
             self.client = AsyncOpenAI(
                 api_key=api_key,

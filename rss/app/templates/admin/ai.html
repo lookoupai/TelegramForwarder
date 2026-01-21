@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="h-full">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI 配置管理</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+                    },
+                },
+            },
+        };
+    </script>
+    <style>
+        body { font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+        .card { box-shadow: 0 6px 30px rgba(15, 23, 42, 0.08); }
+    </style>
+</head>
+<body class="min-h-full bg-slate-50 text-slate-900">
+    <div class="min-h-screen">
+        <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
+            <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
+                <div>
+                    <p class="text-xs uppercase tracking-widest text-slate-400">Telegram Forwarder</p>
+                    <h1 class="text-2xl font-semibold text-slate-900">AI 配置管理</h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="hidden text-sm text-slate-500 sm:block">{{ user.username }}</span>
+                    <a href="/admin/dashboard" class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900">返回控制台</a>
+                    <a href="/logout" class="rounded-full border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:border-slate-300 hover:text-slate-900">退出</a>
+                </div>
+            </div>
+        </header>
+
+        <main class="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+            <div class="grid gap-6 lg:grid-cols-2">
+                <section class="card rounded-2xl bg-white p-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-slate-400">Providers</p>
+                            <h2 class="text-lg font-semibold text-slate-900">AI 提供商</h2>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="refreshProviders()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">刷新</button>
+                        </div>
+                    </div>
+
+                    <p class="mt-3 text-sm text-slate-500">API Key 仅支持“设置/更新”，不会在网页中明文回显；留空表示不修改。</p>
+
+                    <div class="mt-4 overflow-x-auto">
+                        <table class="min-w-full text-left text-sm">
+                            <thead class="text-slate-500">
+                                <tr>
+                                    <th class="py-2 pr-3 font-medium">名称</th>
+                                    <th class="py-2 pr-3 font-medium">类型</th>
+                                    <th class="py-2 pr-3 font-medium">启用</th>
+                                    <th class="py-2 pr-3 font-medium">API Base</th>
+                                    <th class="py-2 pr-3 font-medium">API Key</th>
+                                    <th class="py-2 pr-3 font-medium">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="providers-table" class="text-slate-700"></tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-6 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-sm font-semibold text-slate-800">新增提供商（自定义 OpenAI-Compatible）</h3>
+                            <span id="providers-status" class="text-sm text-slate-500"></span>
+                        </div>
+
+                        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                            <div class="flex flex-col gap-2">
+                                <label class="text-sm font-medium text-slate-600">名称（a-z0-9._-）</label>
+                                <input id="new-provider-name" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="例如：my-openai" />
+                            </div>
+                            <div class="flex flex-col gap-2">
+                                <label class="text-sm font-medium text-slate-600">类型</label>
+                                <select id="new-provider-type" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                                    <option value="openai_compatible">openai_compatible</option>
+                                    <option value="gemini_native">gemini_native</option>
+                                    <option value="claude">claude</option>
+                                </select>
+                            </div>
+                            <div class="flex flex-col gap-2 sm:col-span-2">
+                                <label class="text-sm font-medium text-slate-600">API Base（http/https）</label>
+                                <input id="new-provider-base" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="例如：https://api.example.com/v1" />
+                            </div>
+                            <div class="flex flex-col gap-2 sm:col-span-2">
+                                <label class="text-sm font-medium text-slate-600">API Key</label>
+                                <input id="new-provider-key" type="password" class="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" placeholder="设置后将写入 config/ai_providers.json" />
+                            </div>
+                        </div>
+
+                        <div class="mt-4 flex items-center gap-2">
+                            <button type="button" onclick="createProvider()" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">创建</button>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card rounded-2xl bg-white p-6">
+                    <div class="flex items-center justify-between border-b border-slate-100 pb-4">
+                        <div>
+                            <p class="text-xs uppercase tracking-wider text-slate-400">Models</p>
+                            <h2 class="text-lg font-semibold text-slate-900">模型映射</h2>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="refreshModels()" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:border-slate-300">刷新</button>
+                            <button type="button" onclick="saveModels()" class="rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white hover:bg-blue-700">保存</button>
+                        </div>
+                    </div>
+
+                    <p class="mt-3 text-sm text-slate-500">编辑 provider → models 的 JSON。模型名必须在所有 provider 间全局唯一（避免路由歧义）。</p>
+                    <textarea id="models-json" rows="18" class="mt-4 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500" spellcheck="false"></textarea>
+                    <p id="models-status" class="mt-2 text-sm text-slate-500"></p>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const providerTypeOptions = ['openai_compatible', 'gemini_native', 'claude'];
+
+        function setStatus(id, text, isError = false) {
+            const el = document.getElementById(id);
+            if (!el) return;
+            el.textContent = text || '';
+            el.className = `text-sm ${isError ? 'text-red-600' : 'text-slate-500'}`;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function refreshProviders() {
+            setStatus('providers-status', '加载中...');
+            const resp = await fetch('/admin/api/ai/providers');
+            if (!resp.ok) {
+                setStatus('providers-status', `加载失败：${resp.status}`, true);
+                return;
+            }
+            const data = await resp.json();
+            renderProviders(data);
+            setStatus('providers-status', `已加载：${data.length} 个`);
+        }
+
+        function renderProviders(providers) {
+            const tbody = document.getElementById('providers-table');
+            tbody.innerHTML = '';
+
+            for (const p of providers) {
+                const typeSelect = providerTypeOptions.map(t => {
+                    const selected = p.type === t ? 'selected' : '';
+                    return `<option value="${t}" ${selected}>${t}</option>`;
+                }).join('');
+
+                const keyHint = p.api_key_configured ? `已配置（${escapeHtml(p.api_key_masked || '***')}）` : '未配置';
+                const baseHint = p.api_base_configured ? '已配置' : '未配置';
+
+                const row = document.createElement('tr');
+                row.className = 'border-t border-slate-100';
+                row.innerHTML = `
+                    <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(p.name)}</td>
+                    <td class="py-2 pr-3">
+                        <select data-provider-field="type" class="w-44 rounded-lg border border-slate-200 px-2 py-1 text-xs">
+                            ${typeSelect}
+                        </select>
+                    </td>
+                    <td class="py-2 pr-3">
+                        <input data-provider-field="enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-blue-600" ${p.enabled ? 'checked' : ''} />
+                    </td>
+                    <td class="py-2 pr-3">
+                        <input data-provider-field="api_base" class="w-72 rounded-lg border border-slate-200 px-2 py-1 text-xs" value="${escapeHtml(p.api_base || '')}" placeholder="API Base" />
+                        <div class="mt-1 text-xs text-slate-400">${baseHint}</div>
+                    </td>
+                    <td class="py-2 pr-3">
+                        <input data-provider-field="api_key" type="password" class="w-52 rounded-lg border border-slate-200 px-2 py-1 text-xs" placeholder="留空不修改" />
+                        <div class="mt-1 text-xs text-slate-400">${keyHint}</div>
+                    </td>
+                    <td class="py-2 pr-3">
+                        <div class="flex items-center gap-2">
+                            <button type="button" class="rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800" data-action="save">保存</button>
+                            <button type="button" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300" data-action="test">测试</button>
+                            <button type="button" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300" data-action="sync">拉取模型</button>
+                            <button type="button" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:border-slate-300" data-action="delete">删除</button>
+                        </div>
+                    </td>
+                `;
+
+                row.querySelector('[data-action="save"]').addEventListener('click', () => saveProviderRow(p.name, row));
+                row.querySelector('[data-action="test"]').addEventListener('click', () => testProvider(p.name));
+                row.querySelector('[data-action="sync"]').addEventListener('click', () => syncProviderModels(p.name, p.type));
+                row.querySelector('[data-action="delete"]').addEventListener('click', () => deleteProvider(p.name));
+                tbody.appendChild(row);
+            }
+        }
+
+        async function saveProviderRow(name, row) {
+            setStatus('providers-status', '保存中...');
+            const type = row.querySelector('[data-provider-field="type"]').value;
+            const enabled = row.querySelector('[data-provider-field="enabled"]').checked;
+            const apiBase = row.querySelector('[data-provider-field="api_base"]').value;
+            const apiKey = row.querySelector('[data-provider-field="api_key"]').value;
+
+            const payload = { name, type, enabled, api_base: apiBase };
+            if (apiKey && apiKey.trim()) payload.api_key = apiKey;
+
+            const resp = await fetch('/admin/api/ai/providers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('providers-status', `保存失败：${detail}`, true);
+                return;
+            }
+            setStatus('providers-status', '保存成功');
+            await refreshProviders();
+        }
+
+        async function createProvider() {
+            const name = document.getElementById('new-provider-name').value;
+            const type = document.getElementById('new-provider-type').value;
+            const apiBase = document.getElementById('new-provider-base').value;
+            const apiKey = document.getElementById('new-provider-key').value;
+            setStatus('providers-status', '创建中...');
+
+            const payload = { name, type, enabled: true, api_base: apiBase };
+            if (apiKey && apiKey.trim()) payload.api_key = apiKey;
+
+            const resp = await fetch('/admin/api/ai/providers', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('providers-status', `创建失败：${detail}`, true);
+                return;
+            }
+            document.getElementById('new-provider-name').value = '';
+            document.getElementById('new-provider-base').value = '';
+            document.getElementById('new-provider-key').value = '';
+            setStatus('providers-status', '创建成功');
+            await refreshProviders();
+            await refreshModels();
+        }
+
+        async function deleteProvider(name) {
+            const confirmed = window.confirm(`确认删除提供商 ${name}？将同时删除其模型映射。`);
+            if (!confirmed) return;
+            setStatus('providers-status', '删除中...');
+            const resp = await fetch(`/admin/api/ai/providers/${encodeURIComponent(name)}`, { method: 'DELETE' });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('providers-status', `删除失败：${detail}`, true);
+                return;
+            }
+            setStatus('providers-status', '删除成功');
+            await refreshProviders();
+            await refreshModels();
+        }
+
+        async function testProvider(name) {
+            setStatus('providers-status', `测试中：${name}...`);
+            const resp = await fetch(`/admin/api/ai/providers/${encodeURIComponent(name)}/test`, { method: 'POST' });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('providers-status', `测试失败：${detail}`, true);
+                return;
+            }
+            const data = await resp.json();
+            const latency = data.latency_ms != null ? `${data.latency_ms}ms` : '';
+            const models = data.models_count != null ? `models=${data.models_count}` : '';
+            setStatus('providers-status', `测试成功：${name} ${latency} ${models}`.trim());
+        }
+
+        async function syncProviderModels(name, type) {
+            if (type !== 'openai_compatible') {
+                setStatus('providers-status', `该类型不支持拉取模型：${type}`, true);
+                return;
+            }
+            const confirmed = window.confirm(`确认从 ${name} 拉取模型列表并合并到 ai_models.json？`);
+            if (!confirmed) return;
+            setStatus('providers-status', `拉取模型中：${name}...`);
+            const resp = await fetch(`/admin/api/ai/providers/${encodeURIComponent(name)}/sync-models?mode=merge`, { method: 'POST' });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('providers-status', `拉取失败：${detail}`, true);
+                return;
+            }
+            const data = await resp.json();
+            setStatus('providers-status', `拉取成功：${name} fetched=${data.fetched} added=${data.added} removed=${data.removed} total=${data.total}`);
+            await refreshModels();
+        }
+
+        async function refreshModels() {
+            setStatus('models-status', '加载中...');
+            const resp = await fetch('/admin/api/ai/models');
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('models-status', `加载失败：${detail}`, true);
+                return;
+            }
+            const data = await resp.json();
+            document.getElementById('models-json').value = JSON.stringify(data, null, 2);
+            setStatus('models-status', '已加载');
+        }
+
+        async function saveModels() {
+            setStatus('models-status', '保存中...');
+            let parsed;
+            try {
+                parsed = JSON.parse(document.getElementById('models-json').value || '{}');
+            } catch (e) {
+                setStatus('models-status', `JSON 解析失败：${e.message}`, true);
+                return;
+            }
+            const resp = await fetch('/admin/api/ai/models', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ models: parsed }),
+            });
+            if (!resp.ok) {
+                const detail = await safeReadDetail(resp);
+                setStatus('models-status', `保存失败：${detail}`, true);
+                return;
+            }
+            setStatus('models-status', '保存成功');
+            await refreshModels();
+        }
+
+        async function safeReadDetail(resp) {
+            try {
+                const data = await resp.json();
+                return data.detail || JSON.stringify(data);
+            } catch {
+                return `${resp.status}`;
+            }
+        }
+
+        window.addEventListener('load', async () => {
+            await refreshProviders();
+            await refreshModels();
+        });
+    </script>
+</body>
+</html>

@@ -91,6 +91,20 @@ from services.rule_service import (
     list_rules,
     update_rule_settings,
 )
+from services.ai_admin_service import (
+    AIModelsUpdate,
+    AIProviderOut,
+    AIProviderSyncModelsOut,
+    AIProviderTestOut,
+    AIProviderUpsert,
+    delete_ai_provider,
+    get_ai_models_config,
+    list_ai_providers,
+    sync_models_from_provider,
+    test_ai_provider,
+    update_ai_models_config,
+    upsert_ai_provider,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 templates = Jinja2Templates(directory="rss/app/templates")
@@ -131,6 +145,19 @@ async def admin_dashboard(request: Request, user=Depends(get_current_user)):
     )
 
 
+@router.get("/ai", response_class=HTMLResponse)
+async def admin_ai_settings(request: Request, user=Depends(get_current_user)):
+    if not user:
+        return RedirectResponse(url="/login", status_code=status.HTTP_302_FOUND)
+    return templates.TemplateResponse(
+        "admin/ai.html",
+        {
+            "request": request,
+            "user": user,
+        },
+    )
+
+
 @router.get("/view/rules", response_class=HTMLResponse)
 async def view_rules(request: Request, user=Depends(get_current_user)):
     if not user:
@@ -155,6 +182,71 @@ async def view_rules(request: Request, user=Depends(get_current_user)):
 async def fetch_schema(user=Depends(get_current_user)):
     _require_user(user)
     return get_setting_schema()
+
+
+@router.get("/api/ai/providers", response_model=List[AIProviderOut])
+async def fetch_ai_providers(user=Depends(get_current_user)):
+    _require_user(user)
+    return list_ai_providers()
+
+
+@router.put("/api/ai/providers", response_model=AIProviderOut)
+async def save_ai_provider(payload: AIProviderUpsert, user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        return upsert_ai_provider(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.delete("/api/ai/providers/{provider_name}")
+async def remove_ai_provider(provider_name: str, user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        deleted = delete_ai_provider(provider_name)
+        return {"ok": True, "deleted": deleted}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/api/ai/models", response_model=Dict[str, List[str]])
+async def fetch_ai_models_config(user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        return get_ai_models_config()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.put("/api/ai/models", response_model=Dict[str, List[str]])
+async def save_ai_models_config(payload: AIModelsUpdate, user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        return update_ai_models_config(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/api/ai/providers/{provider_name}/test", response_model=AIProviderTestOut)
+async def trigger_ai_provider_test(provider_name: str, user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        return await test_ai_provider(provider_name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        raise HTTPException(status_code=502, detail="连接测试失败（网络或上游服务异常）")
+
+
+@router.post("/api/ai/providers/{provider_name}/sync-models", response_model=AIProviderSyncModelsOut)
+async def trigger_ai_provider_sync_models(provider_name: str, mode: str = "merge", user=Depends(get_current_user)):
+    _require_user(user)
+    try:
+        return await sync_models_from_provider(provider_name, mode=mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        raise HTTPException(status_code=502, detail="拉取模型失败（网络或上游服务异常）")
 
 
 @router.get("/api/rules", response_model=List[RuleSummary])

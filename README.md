@@ -313,6 +313,29 @@ docker-compose up -d
   
 #### 配置
 
+AI 配置支持两种方式：
+- **推荐：网页后台管理（热更新）**：无需重启进程/容器即可生效，适合频繁增删模型与切换 OpenAI-Compatible 提供商
+- **兼容：环境变量（.env）**：保留原有行为，当 `config/ai_providers.json` 未配置时自动回退
+
+##### 方式一：网页后台管理（推荐，热更新）
+
+进入网页后台 `AI 配置` 页面：
+- `http://你的地址:9804/admin/ai`（或从 `/admin/dashboard` 顶部入口进入）
+
+在页面中可以完成：
+- 管理 AI 提供商：`enabled / api_base / api_key / type`
+- 管理模型映射：`provider -> models`（保存后立即生效）
+- **测试连接**：对 `openai_compatible` 提供商调用 `/v1/models` 验证连通性与返回模型数量
+- **拉取模型**：从 `openai_compatible` 提供商自动拉取模型列表并合并到 `config/ai_models.json`
+
+相关配置文件：
+- `config/ai_providers.json`：提供商连接信息（包含 `api_key`，请妥善保管）
+- `config/ai_models.json`：模型名到提供商的归属映射（模型名需要在所有 provider 间全局唯一）
+
+> 注意：`API Base` 需要包含 `/v1`，例如 `https://api.openai.com/v1`，否则无法正确调用 `/v1/models`。
+
+##### 方式二：环境变量（兼容旧配置）
+
 1. 在 `.env` 文件中配置你的 AI 接口：
 ```ini
 # OpenAI API
@@ -327,7 +350,28 @@ CLAUDE_API_KEY=your_key
 
 #### 自定义模型
 
-没找到想要的模型名字？在 `config/ai_models.json` 中添加即可。
+没找到想要的模型名字？
+- 推荐直接在网页后台 `AI 配置` 中维护（保存后热更新，无需重启）
+- 或手动编辑 `config/ai_models.json`（保存后热更新，无需重启）
+
+#### 自定义 OpenAI-Compatible 提供商（热更新）
+
+当你使用与 OpenAI 规格兼容的第三方接口（只要支持 `/v1/chat/completions` / `/v1/models` 等），可在网页后台新增 provider：
+- `type` 选择 `openai_compatible`
+- 设置 `api_base`（必须包含 `/v1`）与 `api_key`
+- 在模型映射中为该 provider 添加模型名，或点击 `拉取模型` 自动同步
+
+#### Docker 持久化说明
+
+网页后台写入的 AI 配置保存在 `config/` 下。若使用 Docker 部署，请确保持久化挂载：
+- `./config:/app/config`
+
+否则容器重建后（或未挂载卷）配置会丢失。
+
+#### 安全注意事项
+
+- `config/ai_providers.json` 会包含密钥信息，请避免提交到公开仓库，建议仅在部署环境的 volume 中维护。
+- 网页后台不会明文回显 `api_key`，只允许“设置/更新”（留空表示不修改）。
 
 #### AI 处理
 
@@ -564,4 +608,3 @@ UFB相关
 ## 📄 开源协议
 
 本项目采用 [GPL-3.0](LICENSE) 开源协议，详细信息请参阅 [LICENSE](LICENSE) 文件。
-
